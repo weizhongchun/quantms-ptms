@@ -143,6 +143,8 @@ def process_peptide_hit(hit, spectrum, ascore, logger):
             cached_result = process_peptide_hit.result_cache[cache_key]
             for key, value in cached_result.items():
                 hit.setMetaValue(key, value)
+            # Ensure score is set to AScore_pep_score
+            hit.setScore(float(cached_result['AScore_pep_score']))
             return hit
         
         # Configure AScore parameters
@@ -168,7 +170,6 @@ def process_peptide_hit(hit, spectrum, ascore, logger):
         
         # Determine overall score (minimum site score)
         final_score = min(site_scores) if site_scores else -1.0
-        hit.setScore(final_score)
         
         # Set all required metadata fields
         result_cache = {
@@ -198,6 +199,9 @@ def process_peptide_hit(hit, spectrum, ascore, logger):
         # Apply cached results
         for key, value in result_cache.items():
             hit.setMetaValue(key, value)
+        
+        # Set the score to the minimum AScore value
+        hit.setScore(final_score)
         
         # Output phosphorylated peptide information
         if "(Phospho)" in new_seq_str or "(PhosphoDecoy)" in new_seq_str:
