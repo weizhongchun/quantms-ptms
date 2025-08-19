@@ -56,29 +56,28 @@ def save_identifications(out_file, protein_ids, peptide_ids):
             pid.setSignificanceThreshold(0.0)
             
             for hit in pid.getHits():
-                # Ensure all required metadata fields exist
                 seq_str = hit.getSequence().toString()
                 
-                # Set mandatory fields
-                mandatory_meta = [
-                    ("search_engine_sequence", seq_str),
-                    ("regular_phospho_count", seq_str.count("(Phospho)")),
-                    ("phospho_decoy_count", seq_str.count("(PhosphoDecoy)")),
-                    ("AScore_pep_score", hit.getScore()),
-                    ("ProForma", seq_str)
-                ]
+                # Ensure all required metadata fields exist
+                if not hit.metaValueExists("search_engine_sequence"):
+                    hit.setMetaValue("search_engine_sequence", seq_str)
+                if not hit.metaValueExists("regular_phospho_count"):
+                    hit.setMetaValue("regular_phospho_count", seq_str.count("(Phospho)"))
+                if not hit.metaValueExists("phospho_decoy_count"):
+                    hit.setMetaValue("phospho_decoy_count", seq_str.count("(PhosphoDecoy)"))
                 
-                for name, value in mandatory_meta:
-                    hit.setMetaValue(name, value)
+                if hit.metaValueExists("MS:1002052"):
+                    hit.setMetaValue("SpecEValue_score", float(hit.getMetaValue("MS:1002052")))
+                
+                # Then set AScore fields
+                if not hit.metaValueExists("AScore_pep_score"):
+                    hit.setMetaValue("AScore_pep_score", hit.getScore())
                 
                 # Ensure AScore fields exist
                 rank = 1
                 while hit.metaValueExists(f"AScore_{rank}"):
                     hit.setMetaValue(f"AScore_{rank}", float(hit.getMetaValue(f"AScore_{rank}")))
                     rank += 1
-                # Preserve SpecEValue_score
-                if hit.metaValueExists("MS:1002052"):
-                    hit.setMetaValue("SpecEValue_score", float(hit.getMetaValue("MS:1002052")))
 
         # Write with XML format validation
         IdXMLFile().store(out_file, protein_ids, peptide_ids)
@@ -128,20 +127,24 @@ def find_spectrum_by_mz(exp, target_mz, rt=None, ppm_tolerance=10):
 def process_peptide_hit(hit, spectrum, ascore, logger):
     """Optimized phosphorylation analysis"""
     try:
-        seq_str = hit.getSequence().toString()
+        # Store original sequence as search_engine_sequence
+        original_seq_str = hit.getSequence().toString()
+        hit.setMetaValue("search_engine_sequence", original_seq_str)
         
         # Quick check for phosphorylation sites
-        if "(Phospho)" not in seq_str and "(PhosphoDecoy)" not in seq_str:
+        if "(Phospho)" not in original_seq_str and "(PhosphoDecoy)" not in original_seq_str:
             hit.setScore(-1.0)
             hit.setMetaValue("AScore_pep_score", -1.0)
             return hit
         
         # Cache calculation results
-        cache_key = f"{seq_str}_{spectrum.getNativeID()}"
+        cache_key = f"{original_seq_str}_{spectrum.getNativeID()}"
         if hasattr(process_peptide_hit, 'result_cache') and cache_key in process_peptide_hit.result_cache:
             cached_result = process_peptide_hit.result_cache[cache_key]
             for key, value in cached_result.items():
                 hit.setMetaValue(key, value)
+            # Ensure score is set to AScore_pep_score
+            hit.setScore(float(cached_result['AScore_pep_score']))
             return hit
         
         # Configure AScore parameters
@@ -150,6 +153,12 @@ def process_peptide_hit(hit, spectrum, ascore, logger):
         
         # Execute AScore calculation
         scored_hit = ascore.compute(hit, spectrum)
+        
+        # Get the new sequence after AScore reassignment
+        new_seq_str = scored_hit.getSequence().toString()
+        
+        # Set the new sequence as the main sequence
+        hit.setSequence(scored_hit.getSequence())
         
         # Extract site-specific scores
         site_scores = []
@@ -161,13 +170,12 @@ def process_peptide_hit(hit, spectrum, ascore, logger):
         
         # Determine overall score (minimum site score)
         final_score = min(site_scores) if site_scores else -1.0
-        hit.setScore(final_score)
         
         # Set all required metadata fields
         result_cache = {
-            "search_engine_sequence": seq_str,
-            "regular_phospho_count": seq_str.count("(Phospho)"),
-            "phospho_decoy_count": seq_str.count("(PhosphoDecoy)"),
+            "search_engine_sequence": original_seq_str,  # Keep original sequence
+            "regular_phospho_count": new_seq_str.count("(Phospho)"),  # Count from new sequence
+            "phospho_decoy_count": new_seq_str.count("(PhosphoDecoy)"),  # Count from new sequence
             "AScore_pep_score": final_score
         }
         
@@ -192,10 +200,14 @@ def process_peptide_hit(hit, spectrum, ascore, logger):
         for key, value in result_cache.items():
             hit.setMetaValue(key, value)
         
+        # Set the score to the minimum AScore value
+        hit.setScore(final_score)
+        
         # Output phosphorylated peptide information
-        if "(Phospho)" in seq_str or "(PhosphoDecoy)" in seq_str:
+        if "(Phospho)" in new_seq_str or "(PhosphoDecoy)" in new_seq_str:
             print("--------------")
-            print(f"search_engine_sequence: {result_cache['search_engine_sequence']}")
+            print(f"Original sequence: {original_seq_str}")
+            print(f"New sequence: {new_seq_str}")
             print(f"AScore_pep_score: {result_cache['AScore_pep_score']}")
             
             # Output AScore site scores
@@ -209,7 +221,8 @@ def process_peptide_hit(hit, spectrum, ascore, logger):
             
             # Log to debug file
             logger.info("--------------")
-            logger.info(f"search_engine_sequence: {result_cache['search_engine_sequence']}")
+            logger.info(f"Original sequence: {original_seq_str}")
+            logger.info(f"New sequence: {new_seq_str}")
             logger.info(f"AScore_pep_score: {result_cache['AScore_pep_score']}")
             for i in range(1, rank):
                 logger.info(f"AScore_{i}: {result_cache.get(f'AScore_{i}', 'N/A')}")
@@ -226,26 +239,31 @@ def process_peptide_hit(hit, spectrum, ascore, logger):
 def process_peptide_identification(pid, exp, ascore, logger):
     """Process a single peptide identification with error handling"""
     try:
-        # Configure identification-level settings
-        pid.setScoreType("PhosphoScore")
-        pid.setHigherScoreBetter(True)
-        pid.setSignificanceThreshold(0.0)
+        # Create new PeptideIdentification object
+        new_pid = PeptideIdentification(pid)
+        new_pid.setScoreType("PhosphoScore")
+        new_pid.setHigherScoreBetter(True)
+        new_pid.setSignificanceThreshold(0.0)
         
-        # Spectrum matching
+        # Find corresponding spectrum
         spectrum = find_spectrum_by_mz(exp, pid.getMZ(), pid.getRT())
         if not spectrum:
             logger.error(f"Error processing identification: spectrum_not_found for MZ {pid.getMZ()}")
             return {'status': 'error', 'reason': 'spectrum_not_found'}
         
         # Process each peptide hit
-        stats = {'phospho': 0}
+        scored_peptides = []
         for hit in pid.getHits():
-            seq_str = hit.getSequence().toString()
-            if "(Phospho)" in seq_str or "(PhosphoDecoy)" in seq_str:
-                stats['phospho'] += 1
-            process_peptide_hit(hit, spectrum, ascore, logger)
+            # Create new PeptideHit object
+            new_hit = PeptideHit(hit)
+            # Process phosphorylation sites
+            processed_hit = process_peptide_hit(new_hit, spectrum, ascore, logger)
+            scored_peptides.append(processed_hit)
         
-        return {'status': 'success', 'stats': stats}
+        # Set new hits
+        new_pid.setHits(scored_peptides)
+        
+        return {'status': 'success', 'new_pid': new_pid}
         
     except Exception as e:
         logger.error(f"Error processing identification: {str(e)}")
@@ -290,16 +308,19 @@ def main():
             'errors': 0
         }
         
-        # Main processing loop (sequential processing)
+        # Main processing loop
         start_time = time.time()
+        processed_peptide_ids = []
         
-        # Process each PeptideIdentification sequentially
+        # Process each PeptideIdentification
         for pid in peptide_ids:
             try:
                 result = process_peptide_identification(pid, exp, ascore, logger)
                 if result['status'] == 'success':
+                    processed_peptide_ids.append(result['new_pid'])
                     stats['processed'] += 1
-                    stats['phospho'] += result['stats']['phospho']
+                    stats['phospho'] += len([h for h in result['new_pid'].getHits() 
+                                          if "(Phospho)" in h.getSequence().toString()])
                 else:
                     stats['errors'] += 1
                     logger.error(f"Error processing identification: {result['reason']}")
@@ -320,7 +341,7 @@ def main():
         print(f"  Debug log saved to: {log_file}")
         
         # Save results
-        save_identifications(args.out_file, protein_ids, peptide_ids)
+        save_identifications(args.out_file, protein_ids, processed_peptide_ids)
         
     except Exception as e:
         print(f"Fatal error: {str(e)}")
