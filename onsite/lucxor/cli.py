@@ -22,18 +22,18 @@ from pyopenms import (
     IDFilter
 )
 
-from pyLucXor.psm import PSM
-from pyLucXor.peptide import Peptide
-from pyLucXor.models import CIDModel, HCDModel
-from pyLucXor.constants import (
+from onsite.lucxor.psm import PSM
+from onsite.lucxor.peptide import Peptide
+from onsite.lucxor.models import CIDModel, HCDModel
+from onsite.lucxor.constants import (
     NTERM_MOD,
     CTERM_MOD,
     AA_MASSES,
     DEFAULT_CONFIG
 )
-from pyLucXor.spectrum import Spectrum
-from pyLucXor.flr import FLRCalculator
-from pyLucXor.parallel import parallel_psm_processing, get_optimal_thread_count
+from onsite.lucxor.spectrum import Spectrum
+from onsite.lucxor.flr import FLRCalculator
+from onsite.lucxor.parallel import parallel_psm_processing, get_optimal_thread_count
 
 logger = logging.getLogger(__name__)
 

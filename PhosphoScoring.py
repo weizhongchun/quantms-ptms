@@ -8,7 +8,7 @@ import time
 import logging
 from datetime import datetime
 from pyopenms import *
-from Ascore import AScore
+from onsite import AScore
 
 def parse_args():
     """Parse command line arguments with enhanced validation"""

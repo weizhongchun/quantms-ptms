@@ -1,5 +1,5 @@
 """
-Core processing module for pyLucXor.
+Core processing module for LucXor.
 
 This module contains the main processing logic for scoring PSMs and calculating FLR.
 """

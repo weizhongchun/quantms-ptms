@@ -1,5 +1,5 @@
 """
-Parallel processing module for pyLucXor.
+Parallel processing module for LucXor.
 
 This module contains classes and functions for parallel processing.
 """

@@ -1,9 +1,17 @@
-from pyopenms import *
+from pyopenms import (
+    Param,
+    TheoreticalSpectrumGenerator,
+    AASequence,
+    MSSpectrum,
+    PeptideHit,
+    ModificationsDB,
+    Constants
+)
 import math
 import numpy as np
 from collections import defaultdict
 
-class AScore(DefaultParamHandler):
+class AScore:
     """
     Implementation of the Ascore algorithm for phosphorylation site localization.
     
@@ -18,34 +26,31 @@ class AScore(DefaultParamHandler):
     
     def __init__(self):
         """Initialize the AScore object with default parameters."""
-        DefaultParamHandler.__init__(self, "AScore")
         
         # Set default parameters
-        defaults = Param()
-        defaults.setValue("fragment_mass_tolerance", 0.05, "Fragment mass tolerance for spectrum comparisons")
-        defaults.setMinFloat("fragment_mass_tolerance", 0.0)
+        self.param_ = Param()
+        self.param_.setValue("fragment_mass_tolerance", 0.05, "Fragment mass tolerance for spectrum comparisons")
+        self.param_.setMinFloat("fragment_mass_tolerance", 0.0)
         
-        defaults.setValue("fragment_mass_unit", "Da", "Unit of fragment mass tolerance")
-        defaults.setValidStrings("fragment_mass_unit", ["Da", "ppm"])
+        self.param_.setValue("fragment_mass_unit", "Da", "Unit of fragment mass tolerance")
+        self.param_.setValidStrings("fragment_mass_unit", ["Da", "ppm"])
         
         advanced = ["advanced"]  # tag for advanced parameters
         
-        defaults.setValue("max_peptide_length", 40, 
+        self.param_.setValue("max_peptide_length", 40, 
                          "Restrict scoring to peptides with a length no greater than this value ('0' for 'no restriction')", 
                          advanced)
-        defaults.setMinInt("max_peptide_length", 0)
+        self.param_.setMinInt("max_peptide_length", 0)
         
-        defaults.setValue("max_num_perm", 16384, 
+        self.param_.setValue("max_num_perm", 16384, 
                          "Maximum number of permutations a sequence can have to be processed ('0' for 'no restriction')", 
                          advanced)
-        defaults.setMinInt("max_num_perm", 0)
+        self.param_.setMinInt("max_num_perm", 0)
         
-        defaults.setValue("add_decoy", "false", 
+        self.param_.setValue("add_decoy", "false", 
                          "Include PhosphoDecoy site (A) in phosphorylation site analysis for FLR calculation", 
                          advanced)
-        defaults.setValidStrings("add_decoy", ["true", "false"])
-        
-        self.setDefaults(defaults)
+        self.param_.setValidStrings("add_decoy", ["true", "false"])
         
         # Initialize member variables
         self.fragment_mass_tolerance_ = 0.05
@@ -63,6 +68,15 @@ class AScore(DefaultParamHandler):
         p.setValue("add_first_prefix_ion", "true")
         self.spectrum_generator_.setParameters(p)
         
+        self.updateMembers_()
+    
+    def getParameter(self, name):
+        """Get a parameter by name."""
+        return self.param_.getValue(name)
+    
+    def setParameter(self, name, value):
+        """Set a parameter by name and value."""
+        self.param_.setValue(name, value)
         self.updateMembers_()
     
     def updateMembers_(self):
