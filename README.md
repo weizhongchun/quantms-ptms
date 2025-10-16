@@ -2,7 +2,7 @@
 
 Mass spectrometry post-translational modification localization tool.
 
-This package provides comprehensive tools for phosphorylation site localization and scoring using multiple state-of-the-art algorithms including AScore, PhosphoRS, and LucXor (LuciPHOr2).
+This package provides comprehensive tools for phosphorylation site localization and scoring using algorithms including AScore, PhosphoRS, and LucXor (LuciPHOr2).
 
 ## Features
 
@@ -504,3 +504,4 @@ For questions, bug reports, or feature requests, please:
 ## Acknowledgments
 
 OnSite builds upon the excellent work of the original algorithm developers and the OpenMS community. We thank all contributors and users for their feedback and support.
+
