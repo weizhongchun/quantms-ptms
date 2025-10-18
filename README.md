@@ -222,7 +222,7 @@ results = processor.process_all_psms(psm_list, spectrum_map)
 
 ```python
 from onsite.phospho_scoring import main as phospho_scoring_main
-from onsite.phosphors_scoring import main as phosphors_scoring_main
+from onsite.phosphors.phosphors_scoring import main as phosphors_scoring_main
 
 # Run PhosphoScoring pipeline programmatically
 # Note: These functions expect command line arguments
@@ -391,10 +391,14 @@ poetry run flake8
 onsite/
 ├── onsite/                    # Main package directory
 │   ├── __init__.py           # Package initialization and exports
-│   ├── ascore.py             # AScore algorithm implementation
-│   ├── phosphors.py          # PhosphoRS algorithm implementation
+│   ├── ascore/               # AScore algorithm package
+│   │   ├── __init__.py       # AScore package initialization
+│   │   └── ascore.py         # AScore algorithm implementation
+│   ├── phosphors/             # PhosphoRS algorithm package
+│   │   ├── __init__.py       # PhosphoRS package initialization
+│   │   ├── phosphors.py      # PhosphoRS algorithm implementation
+│   │   └── phosphors_scoring.py  # PhosphoRS-based scoring pipeline
 │   ├── phospho_scoring.py    # AScore-based scoring pipeline
-│   ├── phosphors_scoring.py  # PhosphoRS-based scoring pipeline
 │   ├── onsitec.py            # Unified command-line interface
 │   └── lucxor/               # LucXor (LuciPHOr2) implementation
 │       ├── __init__.py       # LucXor package initialization
