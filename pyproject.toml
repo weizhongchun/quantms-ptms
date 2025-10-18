@@ -32,7 +32,7 @@ Repository = "https://github.com/bigbio/onsite"
 Documentation = "https://github.com/bigbio/onsite"
 
 [project.scripts]
-onsite = "onsite.cli:main"
+onsite = "onsite.onsitec:main"
 phospho-scoring = "onsite.phospho_scoring:main"
 phosphors-scoring = "onsite.phosphors_scoring:main"
 lucxor = "onsite.lucxor.cli:main"

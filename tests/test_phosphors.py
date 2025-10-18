@@ -5,7 +5,9 @@ Test PhosphoRS algorithm.
 import pytest
 import sys
 import os
-from pyopenms import AASequence, MSSpectrum, Peak1D
+from pyopenms import AASequence, MSSpectrum, Peak1D, PeptideHit
+from onsite import calculate_phospho_localization_compomics_style
+from onsite import calculate_phospho_localization_compomics_style
 
 # Add the parent directory to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -17,9 +19,6 @@ def test_phosphors_import():
 
 def test_phosphors_with_peptide():
     """Test PhosphoRS with a simple phosphorylated peptide."""
-    from onsite import calculate_phospho_localization_compomics_style
-    from pyopenms import AASequence, PeptideHit, MSSpectrum, Peak1D
-    
     # Create a phosphorylated peptide
     sequence = AASequence.fromString("PEPTIDE(Phospho)")
     hit = PeptideHit()
@@ -43,9 +42,6 @@ def test_phosphors_with_peptide():
 
 def test_phosphors_parameters():
     """Test PhosphoRS with different parameters."""
-    from onsite import calculate_phospho_localization_compomics_style
-    from pyopenms import AASequence, PeptideHit, MSSpectrum
-    
     # Create a phosphorylated peptide
     sequence = AASequence.fromString("PEPTIDE(Phospho)")
     hit = PeptideHit()

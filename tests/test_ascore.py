@@ -5,15 +5,14 @@ Test AScore algorithm.
 import pytest
 import sys
 import os
-from pyopenms import AASequence, MSSpectrum, Peak1D
+from pyopenms import AASequence, MSSpectrum, Peak1D, PeptideHit
+from onsite import AScore
 
 # Add the parent directory to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def test_ascore_initialization():
     """Test AScore initialization."""
-    from onsite import AScore
-    
     ascore = AScore()
     assert ascore is not None
     assert hasattr(ascore, 'fragment_mass_tolerance_')
@@ -21,8 +20,6 @@ def test_ascore_initialization():
 
 def test_ascore_parameters():
     """Test AScore parameter setting."""
-    from onsite import AScore
-    
     ascore = AScore()
     
     # Test parameter setting
@@ -34,8 +31,6 @@ def test_ascore_parameters():
 
 def test_ascore_with_peptide():
     """Test AScore with a simple peptide."""
-    from onsite import AScore
-    from pyopenms import AASequence, PeptideHit, MSSpectrum, Peak1D
     
     ascore = AScore()
     

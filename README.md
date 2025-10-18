@@ -395,7 +395,7 @@ onsite/
 │   ├── phosphors.py          # PhosphoRS algorithm implementation
 │   ├── phospho_scoring.py    # AScore-based scoring pipeline
 │   ├── phosphors_scoring.py  # PhosphoRS-based scoring pipeline
-│   ├── cli.py                # Unified command-line interface
+│   ├── onsitec.py            # Unified command-line interface
 │   └── lucxor/               # LucXor (LuciPHOr2) implementation
 │       ├── __init__.py       # LucXor package initialization
 │       ├── cli.py            # LucXor command-line interface
