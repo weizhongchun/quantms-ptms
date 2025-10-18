@@ -7,7 +7,6 @@ import sys
 import os
 from pyopenms import AASequence, MSSpectrum, Peak1D, PeptideHit
 from onsite import calculate_phospho_localization_compomics_style
-from onsite import calculate_phospho_localization_compomics_style
 
 # Add the parent directory to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
