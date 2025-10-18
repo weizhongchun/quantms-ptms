@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
-import argparse
+import click
 import traceback
 import time
 import logging
@@ -12,30 +12,31 @@ from concurrent.futures import as_completed
 from pyopenms import *
 from .phosphors import calculate_phospho_localization_compomics_style
 
-def parse_args():
-    """Parse command line arguments with enhanced validation"""
-    parser = argparse.ArgumentParser(
-        description='Phosphorylation site localization scoring tool using PhosphoRS',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument('-in', dest='in_file', required=True, 
-                       help='Input mzML file path')
-    parser.add_argument('-id', dest='id_file', required=True,
-                       help='Input idXML file path')
-    parser.add_argument('-out', dest='out_file', required=True,
-                       help='Output idXML file path')
-    parser.add_argument('-fragment_mass_tolerance', type=float, default=0.05,
-                       help='Fragment mass tolerance value')
-    parser.add_argument('-fragment_mass_unit', choices=['Da', 'ppm'], default='Da',
-                       help='Tolerance unit (Da or ppm)')
-    parser.add_argument('-threads', dest='threads', type=int, default=1,
-                       help='Number of parallel processes (1 = sequential)')
-    parser.add_argument('-debug', dest='debug', action='store_true',
-                       help='Enable debug output and write debug log')
-    # removed --compare option
-    parser.add_argument('--add_decoys', dest='add_decoys', action='store_true', default=False,
-                       help='Include A (PhosphoDecoy) as potential phosphorylation site')
-    return parser.parse_args()
+@click.command()
+@click.option('-in', '--in-file', 'in_file', required=True, 
+              help='Input mzML file path', type=click.Path(exists=True))
+@click.option('-id', '--id-file', 'id_file', required=True,
+              help='Input idXML file path', type=click.Path(exists=True))
+@click.option('-out', '--out-file', 'out_file', required=True,
+              help='Output idXML file path', type=click.Path())
+@click.option('--fragment-mass-tolerance', 'fragment_mass_tolerance', type=float, default=0.05,
+              help='Fragment mass tolerance value (default: 0.05)')
+@click.option('--fragment-mass-unit', 'fragment_mass_unit', type=click.Choice(['Da', 'ppm']), default='Da',
+              help='Tolerance unit (default: Da)')
+@click.option('--threads', 'threads', type=int, default=1,
+              help='Number of parallel processes (default: 1)')
+@click.option('--debug', 'debug', is_flag=True,
+              help='Enable debug output and write debug log')
+@click.option('--add-decoys', 'add_decoys', is_flag=True, default=False,
+              help='Include A (PhosphoDecoy) as potential phosphorylation site')
+def main(in_file, id_file, out_file, fragment_mass_tolerance, fragment_mass_unit, 
+         threads, debug, add_decoys):
+    """
+    Phosphorylation site localization scoring tool using PhosphoRS algorithm.
+    
+    This tool processes MS/MS spectra and peptide identifications to localize
+    phosphorylation sites using the PhosphoRS algorithm.
+    """
 
 def load_spectra(mzml_file):
     """Load MS/MS spectra with progress feedback"""
@@ -238,9 +239,9 @@ def process_peptide_hit(hit, spectrum, logger):
         site_probs, isomer_list = calculate_phospho_localization_compomics_style(
             hit,
             spectrum,
-            fragment_tolerance=args.fragment_mass_tolerance,
-            fragment_method_ppm=(args.fragment_mass_unit == 'ppm'),
-            add_decoys=getattr(args, 'add_decoys', False)
+            fragment_tolerance=fragment_mass_tolerance,
+            fragment_method_ppm=(fragment_mass_unit == 'ppm'),
+            add_decoys=add_decoys
         )
 
         if site_probs is None or isomer_list is None:
@@ -290,7 +291,7 @@ def process_peptide_hit(hit, spectrum, logger):
         # strict comparison removed
 
         # Output phosphorylated peptide information (console and optional debug log)
-        if args.debug:
+        if debug:
             print("--------------")
             print(f"Original sequence: {result_cache['search_engine_sequence']}")
             print(f"Legacy new sequence: {result_cache['new_sequence']}")
@@ -369,31 +370,26 @@ def log_debug(log_file, enabled):
         logger.addHandler(logging.NullHandler())
     return logger
 
-def main():
-    """Main workflow"""
     try:
-        global args
-        args = parse_args()
-
         # Initialize processing pipeline
-        exp = load_spectra(args.in_file)
-        protein_ids, peptide_ids = load_identifications(args.id_file)
+        exp = load_spectra(in_file)
+        protein_ids, peptide_ids = load_identifications(id_file)
         # Prime spectrum cache
         if peptide_ids:
             _ = find_spectrum_by_mz(exp, peptide_ids[0].getMZ(), peptide_ids[0].getRT())
 
-        # Initialize debug log (only when -debug)
-        log_file = f"{args.out_file}.debug.log"
-        logger = log_debug(log_file, args.debug)
-        if args.debug:
+        # Initialize debug log (only when --debug)
+        log_file = f"{out_file}.debug.log"
+        logger = log_debug(log_file, debug)
+        if debug:
             logger.info("PhosphoRSScoring Debug Log")
             logger.info(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            logger.info(f"Input file: {args.in_file}")
-            logger.info(f"Identification file: {args.id_file}")
-            logger.info(f"Output file: {args.out_file}")
-            logger.info(f"Fragment mass tolerance: {args.fragment_mass_tolerance} {args.fragment_mass_unit}")
-            logger.info(f"Threads: {args.threads}")
-            logger.info(f"Add decoys: {getattr(args, 'add_decoys', False)}")
+            logger.info(f"Input file: {in_file}")
+            logger.info(f"Identification file: {id_file}")
+            logger.info(f"Output file: {out_file}")
+            logger.info(f"Fragment mass tolerance: {fragment_mass_tolerance} {fragment_mass_unit}")
+            logger.info(f"Threads: {threads}")
+            logger.info(f"Add decoys: {add_decoys}")
             logger.info(f"Total spectra: {exp.size()}")
             logger.info(f"Total identifications: {len(peptide_ids)}")
 
@@ -409,7 +405,7 @@ def main():
         processed_peptide_ids = []
 
         # Sequential or parallel processing
-        if max(1, int(args.threads)) == 1:
+        if max(1, int(threads)) == 1:
             for i, pid in enumerate(peptide_ids):
                 try:
                     result = process_peptide_identification(pid, exp, logger)
@@ -420,23 +416,23 @@ def main():
                                               if "(Phospho)" in h.getSequence().toString()])
                     else:
                         stats['errors'] += 1
-                        if args.debug:
+                        if debug:
                             logger.error(f"Error processing identification: {result['reason']}")
                 except Exception as e:
                     stats['errors'] += 1
-                    if args.debug:
+                    if debug:
                         logger.error(f"Error processing identification: {str(e)}")
                     traceback.print_exc()
         else:
-            workers = max(1, int(args.threads))
+            workers = max(1, int(threads))
             print(f"[{time.strftime('%H:%M:%S')}] Parallel execution with {workers} processes")
-            if args.debug:
+            if debug:
                 logger.info(f"Starting parallel processing with {workers} workers")
 
             params = {
-                'fragment_mass_tolerance': args.fragment_mass_tolerance,
-                'fragment_mass_unit': args.fragment_mass_unit,
-                'add_decoys': bool(getattr(args, 'add_decoys', False)),
+                'fragment_mass_tolerance': fragment_mass_tolerance,
+                'fragment_mass_unit': fragment_mass_unit,
+                'add_decoys': bool(add_decoys),
             }
             tasks = []
             for idx, pid in enumerate(peptide_ids):
@@ -447,7 +443,7 @@ def main():
                     hit_payloads.append({'sequence': seq_str, 'proforma': proforma})
                 tasks.append({
                     'idx': idx,
-                    'mzml_path': args.in_file,
+                    'mzml_path': in_file,
                     'params': params,
                     'pid': {
                         'mz': pid.getMZ(),
@@ -513,7 +509,7 @@ def main():
                     stats['phospho'] += len([h for h in new_pid.getHits() if "(Phospho)" in h.getSequence().toString()])
                 else:
                     stats['errors'] += 1
-                    if args.debug:
+                    if debug:
                         logger.error(f"Error processing identification: {res.get('reason', 'unknown')}")
 
         # Report
@@ -525,15 +521,20 @@ def main():
         print(f"  Processing errors: {stats['errors']}")
         print(f"  Time elapsed: {elapsed:.2f} seconds")
         print(f"  Processing speed: {stats['processed']/elapsed:.2f} IDs/second")
-        if args.debug:
+        if debug:
             print(f"  Debug log saved to: {log_file}")
 
         # Save results
-        save_identifications(args.out_file, protein_ids, processed_peptide_ids)
+        save_identifications(out_file, protein_ids, processed_peptide_ids)
 
+    except KeyboardInterrupt:
+        click.echo("\nOperation cancelled by user")
+        sys.exit(1)
     except Exception as e:
-        print(f"Fatal error: {str(e)}")
-        traceback.print_exc()
+        click.echo(f"Error: {str(e)}")
+        if debug:
+            logger.error(f"Error: {str(e)}")
+            logger.error(traceback.format_exc())
         sys.exit(1)
 
 if __name__ == "__main__":

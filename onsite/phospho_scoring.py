@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
-import argparse
+import click
 import traceback
 import time
 import logging
@@ -12,29 +12,110 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pyopenms import *
 from onsite.ascore import AScore
 
-def parse_args():
-    """Parse command line arguments"""
-    parser = argparse.ArgumentParser(
-        description='Phosphorylation site localization scoring tool',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument('-in', dest='in_file', required=True, 
-                       help='Input mzML file path')
-    parser.add_argument('-id', dest='id_file', required=True,
-                       help='Input idXML file path')
-    parser.add_argument('-out', dest='out_file', required=True,
-                       help='Output idXML file path')
-    parser.add_argument('-fragment_mass_tolerance', type=float, default=0.05,
-                       help='Fragment mass tolerance value')
-    parser.add_argument('-fragment_mass_unit', choices=['Da', 'ppm'], default='Da',
-                       help='Tolerance unit (Da or ppm)')
-    parser.add_argument('-threads', dest='threads', type=int, default=4,
-                       help='Number of parallel threads')
-    parser.add_argument('-debug', dest='debug', action='store_true',
-                       help='Enable debug output and write debug log')
-    parser.add_argument('--add_decoys', dest='add_decoys', action='store_true', default=False,
-                       help='Include A (PhosphoDecoy) as potential phosphorylation site')
-    return parser.parse_args()
+@click.command()
+@click.option('-in', '--in-file', 'in_file', required=True, 
+              help='Input mzML file path', type=click.Path(exists=True))
+@click.option('-id', '--id-file', 'id_file', required=True,
+              help='Input idXML file path', type=click.Path(exists=True))
+@click.option('-out', '--out-file', 'out_file', required=True,
+              help='Output idXML file path', type=click.Path())
+@click.option('--fragment-mass-tolerance', 'fragment_mass_tolerance', type=float, default=0.05,
+              help='Fragment mass tolerance value (default: 0.05)')
+@click.option('--fragment-mass-unit', 'fragment_mass_unit', type=click.Choice(['Da', 'ppm']), default='Da',
+              help='Tolerance unit (default: Da)')
+@click.option('--threads', 'threads', type=int, default=4,
+              help='Number of parallel threads (default: 4)')
+@click.option('--debug', 'debug', is_flag=True,
+              help='Enable debug output and write debug log')
+@click.option('--add-decoys', 'add_decoys', is_flag=True, default=False,
+              help='Include A (PhosphoDecoy) as potential phosphorylation site')
+def main(in_file, id_file, out_file, fragment_mass_tolerance, fragment_mass_unit, 
+         threads, debug, add_decoys):
+    """
+    Phosphorylation site localization scoring tool using AScore algorithm.
+    
+    This tool processes MS/MS spectra and peptide identifications to localize
+    phosphorylation sites using the AScore algorithm.
+    """
+    try:
+        # Initialize processing pipeline
+        exp = load_spectra(in_file)
+        protein_ids, peptide_ids = load_identifications(id_file)
+        # Pre-initialize spectrum cache once in the main thread
+        if peptide_ids:
+            _ = find_spectrum_by_mz(exp, peptide_ids[0].getMZ(), peptide_ids[0].getRT())
+        
+        # Initialize debug log (only when --debug)
+        log_file = f"{out_file}.debug.log"
+        logger = log_debug(log_file, debug)
+        if debug:
+            logger.info("PhosphoScoring Debug Log")
+            logger.info(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            logger.info(f"Input file: {in_file}")
+            logger.info(f"Identification file: {id_file}")
+            logger.info(f"Output file: {out_file}")
+            logger.info(f"Fragment mass tolerance: {fragment_mass_tolerance} {fragment_mass_unit}")
+            logger.info(f"Threads: {threads}")
+            logger.info(f"Add decoys: {add_decoys}")
+        
+        # Process peptide identifications
+        start_time = time.time()
+        
+        if threads == 1:
+            # Sequential processing
+            click.echo(f"[{time.strftime('%H:%M:%S')}] Processing {len(peptide_ids)} peptide identifications sequentially...")
+            for i, pid in enumerate(peptide_ids):
+                if debug and i % 100 == 0:
+                    logger.info(f"Processing peptide identification {i+1}/{len(peptide_ids)}")
+                process_peptide_identification(pid, exp, logger, add_decoys)
+        else:
+            # Parallel processing
+            click.echo(f"[{time.strftime('%H:%M:%S')}] Processing {len(peptide_ids)} peptide identifications using {threads} threads...")
+            
+            # Use ThreadPoolExecutor for I/O bound operations
+            with ThreadPoolExecutor(max_workers=threads) as executor:
+                # Submit all tasks
+                future_to_pid = {
+                    executor.submit(_worker_process_pid, (pid, in_file, fragment_mass_tolerance, fragment_mass_unit, add_decoys, debug)): pid
+                    for pid in peptide_ids
+                }
+                
+                # Process completed tasks
+                completed = 0
+                for future in as_completed(future_to_pid):
+                    try:
+                        result = future.result()
+                        completed += 1
+                        if debug and completed % 100 == 0:
+                            logger.info(f"Completed {completed}/{len(peptide_ids)} peptide identifications")
+                    except Exception as exc:
+                        pid = future_to_pid[future]
+                        click.echo(f'Peptide identification generated an exception: {exc}')
+                        if debug:
+                            logger.error(f"Error processing peptide identification: {exc}")
+                            logger.error(traceback.format_exc())
+        
+        # Save results
+        click.echo(f"[{time.strftime('%H:%M:%S')}] Saving results to {out_file}")
+        save_identifications(out_file, protein_ids, peptide_ids)
+        
+        end_time = time.time()
+        processing_time = end_time - start_time
+        click.echo(f"[{time.strftime('%H:%M:%S')}] Processing completed in {processing_time:.2f} seconds")
+        
+        if debug:
+            logger.info(f"Processing completed in {processing_time:.2f} seconds")
+            logger.info("PhosphoScoring Debug Log End")
+        
+    except KeyboardInterrupt:
+        click.echo("\nOperation cancelled by user")
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {str(e)}")
+        if debug:
+            logger.error(f"Error: {str(e)}")
+            logger.error(traceback.format_exc())
+        sys.exit(1)
 
 def load_spectra(mzml_file):
     """Load MS/MS spectra"""
@@ -54,590 +135,300 @@ def load_identifications(idxml_file):
     return protein_ids, peptide_ids
 
 def save_identifications(out_file, protein_ids, peptide_ids):
-    """Save results"""
-    try:
-        # Ensure all critical metadata fields exist
-        for pid in peptide_ids:
-            # Set identification-level attributes
-            pid.setScoreType("PhosphoScore")
-            pid.setHigherScoreBetter(True)
-            pid.setSignificanceThreshold(0.0)
-            
-            for hit in pid.getHits():
-                seq_str = hit.getSequence().toString()
-                
-                # Ensure all required metadata fields exist
-                if not hit.metaValueExists("search_engine_sequence"):
-                    hit.setMetaValue("search_engine_sequence", seq_str)
-                if not hit.metaValueExists("regular_phospho_count"):
-                    hit.setMetaValue("regular_phospho_count", seq_str.count("(Phospho)"))
-                if not hit.metaValueExists("phospho_decoy_count"):
-                    hit.setMetaValue("phospho_decoy_count", seq_str.count("(PhosphoDecoy)"))
-                
-                # Then set AScore fields
-                if not hit.metaValueExists("AScore_pep_score"):
-                    hit.setMetaValue("AScore_pep_score", hit.getScore())
-                
-                # Do not rewrite individual AScore_* metas here to preserve insertion order
+    """Save identification results"""
+    print(f"[{time.strftime('%H:%M:%S')}] Saving {len(peptide_ids)} peptide identifications to {out_file}")
+    IdXMLFile().store(out_file, protein_ids, peptide_ids)
 
-        # Write with XML format validation
-        IdXMLFile().store(out_file, protein_ids, peptide_ids)
-        print(f"Successfully saved {len(peptide_ids)} identifications to {out_file}")
-    except Exception as e:
-        print(f"Critical error saving results: {str(e)}")
-        traceback.print_exc()
-        sys.exit(1)
-
-# ----------------------- Multiprocessing worker utilities -----------------------
-_WORKER_EXP = None
-
-def _worker_get_exp(mzml_file):
-    global _WORKER_EXP
-    if _WORKER_EXP is None:
-        exp = MSExperiment()
-        FileHandler().loadExperiment(mzml_file, exp)
-        # Warm up spectrum index inside the worker for faster lookups
-        if exp.size() > 0:
-            # Rebuild local cache for find_spectrum_by_mz in this process
-            if hasattr(find_spectrum_by_mz, 'spectrum_list'):
-                delattr(find_spectrum_by_mz, 'spectrum_list')
-            _ = find_spectrum_by_mz(exp, 0.0, None)
-        _WORKER_EXP = exp
-    return _WORKER_EXP
-
-def _worker_process_pid(task):
-    try:
-        mzml_path = task['mzml_path']
-        pid_info = task['pid']
-        params = task['params']
-
-        exp = _worker_get_exp(mzml_path)
-
-        # Find spectrum
-        spectrum = find_spectrum_by_mz(exp, pid_info['mz'], pid_info.get('rt'))
-        if spectrum is None:
-            return {'status': 'error', 'reason': 'spectrum_not_found'}
-
-        # Configure AScore instance per task
-        ascore = AScore()
-        ascore.fragment_mass_tolerance_ = params['fragment_mass_tolerance']
-        ascore.fragment_tolerance_ppm_ = params['fragment_mass_unit'] == 'ppm'
-        ascore.setAddDecoys(params.get('add_decoys', False))
-
-        results = []
-        for hit_info in pid_info['hits']:
-            # Rebuild hit from sequence
-            seq = AASequence.fromString(hit_info['sequence'])
-            hit = PeptideHit()
-            hit.setSequence(seq)
-            if 'proforma' in hit_info and hit_info['proforma'] is not None:
-                hit.setMetaValue('ProForma', hit_info['proforma'])
-
-            scored_hit = ascore.compute(hit, spectrum)
-
-            # Extract metas in deterministic order
-            new_seq_str = scored_hit.getSequence().toString()
-
-            # Collect site scores
-            site_scores = []
-            rank = 1
-            while scored_hit.metaValueExists(f"AScore_{rank}"):
-                site_scores.append(float(scored_hit.getMetaValue(f"AScore_{rank}")))
-                rank += 1
-
-            ascore_pep_score = float(scored_hit.getMetaValue('AScore_pep_score')) if scored_hit.metaValueExists('AScore_pep_score') else -1.0
-            best_ascore = min(site_scores) if site_scores else -1.0
-
-            meta_fields = []
-            meta_fields.append(("search_engine_sequence", hit_info['sequence']))
-            meta_fields.append(("regular_phospho_count", new_seq_str.count("(Phospho)")))
-            meta_fields.append(("phospho_decoy_count", new_seq_str.count("(PhosphoDecoy)")))
-            meta_fields.append(("AScore_pep_score", ascore_pep_score))
-            for i, score in enumerate(site_scores, 1):
-                meta_fields.append((f"AScore_{i}", score))
-            if scored_hit.metaValueExists('ProForma'):
-                meta_fields.append(("ProForma", scored_hit.getMetaValue('ProForma')))
-
-            results.append({
-                'new_sequence': new_seq_str,
-                'best_ascore': best_ascore,
-                'meta_fields': meta_fields
-            })
-
-        return {'status': 'success', 'hits': results}
-    except Exception as e:
-        return {'status': 'error', 'reason': str(e)}
+def log_debug(log_file, debug):
+    """Setup debug logging"""
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG if debug else logging.INFO)
+    
+    if debug:
+        handler = logging.FileHandler(log_file)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+    
+    return logger
 
 def find_spectrum_by_mz(exp, target_mz, rt=None, ppm_tolerance=10):
-    """Optimized spectrum matching with caching"""
-    # Binary search for optimized spectrum matching
-    if not hasattr(find_spectrum_by_mz, 'spectrum_cache'):
-        find_spectrum_by_mz.spectrum_cache = {}
-        find_spectrum_by_mz.spectrum_list = []
-        
-        # Preprocess all MS2 spectra
-        for spec in exp:
-            if spec.getMSLevel() == 2 and spec.getPrecursors():
-                mz = spec.getPrecursors()[0].getMZ()
-                find_spectrum_by_mz.spectrum_list.append((mz, spec))
-        
-        # Sort by m/z
-        find_spectrum_by_mz.spectrum_list.sort(key=lambda x: x[0])
+    """
+    Find spectrum by m/z and optionally retention time.
     
-    # Binary search for the closest m/z
-    left, right = 0, len(find_spectrum_by_mz.spectrum_list) - 1
-    best_match = None
-    min_diff = float('inf')
+    Args:
+        exp: MSExperiment containing spectra
+        target_mz: Target m/z value
+        rt: Retention time (optional)
+        ppm_tolerance: PPM tolerance for m/z matching
     
-    while left <= right:
-        mid = (left + right) // 2
-        mz, spec = find_spectrum_by_mz.spectrum_list[mid]
-        diff = abs(mz - target_mz)
-        
-        if diff < min_diff:
-            min_diff = diff
-            best_match = spec
-        
-        if mz < target_mz:
-            left = mid + 1
-        else:
-            right = mid - 1
+    Returns:
+        MSSpectrum or None if not found
+    """
+    best_spectrum = None
+    best_mz_diff = float('inf')
     
-    return best_match
+    for spec in exp:
+        spec_mz = spec.getPrecursors()[0].getMZ() if spec.getPrecursors() else 0
+        
+        # Calculate m/z difference in ppm
+        mz_diff_ppm = abs(spec_mz - target_mz) / target_mz * 1e6
+        
+        if mz_diff_ppm <= ppm_tolerance:
+            if rt is not None:
+                spec_rt = spec.getRT()
+                rt_diff = abs(spec_rt - rt)
+                if rt_diff > 0.1:  # 0.1 second tolerance
+                    continue
+            
+            if mz_diff_ppm < best_mz_diff:
+                best_mz_diff = mz_diff_ppm
+                best_spectrum = spec
+    
+    return best_spectrum
 
-def process_peptide_hit(hit, spectrum, ascore, logger, add_decoys=False):
-    """Optimized phosphorylation analysis"""
+def _worker_get_exp(mzml_file):
+    """Worker function to load experiment data"""
+    exp = MSExperiment()
+    FileHandler().loadExperiment(mzml_file, exp)
+    return exp
+
+def _worker_process_pid(task):
+    """Worker function to process peptide identification"""
+    pid, mzml_file, fragment_mass_tolerance, fragment_mass_unit, add_decoys, debug = task
+    
+    # Load experiment data for this worker
+    exp = _worker_get_exp(mzml_file)
+    
+    # Create a logger for this worker
+    logger = logging.getLogger(f"{__name__}_worker")
+    logger.setLevel(logging.DEBUG if debug else logging.INFO)
+    
     try:
-        # Set add_decoys parameter
-        ascore.setAddDecoys(add_decoys)
+        return process_peptide_identification(pid, exp, logger, add_decoys)
+    except Exception as e:
+        logger.error(f"Error in worker processing: {e}")
+        raise
+
+def process_peptide_hit(hit, spectrum, logger):
+    """
+    Process a single peptide hit with AScore.
+    
+    Args:
+        hit: PeptideHit to process
+        spectrum: Associated MSSpectrum
+        logger: Logger instance
+    
+    Returns:
+        Modified PeptideHit with AScore annotations
+    """
+    if not spectrum:
+        logger.warning("No spectrum found for peptide hit")
+        # Set default values for missing spectrum
+        hit.setMetaValue("AScore_pep_score", -1.0)
+        return hit
+    
+    try:
+        # Get peptide sequence
+        sequence = hit.getSequence()
+        original_seq_str = sequence.toString()
         
-        # Store original sequence as search_engine_sequence
-        original_seq_str = hit.getSequence().toString()
-        hit.setMetaValue("search_engine_sequence", original_seq_str)
-        
-        # Quick check for phosphorylation sites
-        if "(Phospho)" not in original_seq_str and "(PhosphoDecoy)" not in original_seq_str:
-            hit.setScore(-1.0)
+        # Check if peptide has phosphorylation sites
+        has_phospho = any('p' in str(seq.getModification()) for seq in sequence)
+        if not has_phospho:
+            logger.debug(f"No phosphorylation sites found in {original_seq_str}")
             hit.setMetaValue("AScore_pep_score", -1.0)
-            if logger and logger.isEnabledFor(logging.INFO):
-                logger.info(f"Skipping non-phosphorylated peptide: {original_seq_str}")
-            return hit
-        
-        if logger and logger.isEnabledFor(logging.INFO):
-            logger.info(f"Processing phosphorylated peptide: {original_seq_str}")
-        
-        # Cache calculation results
-        cache_key = f"{original_seq_str}_{spectrum.getNativeID()}"
-        if hasattr(process_peptide_hit, 'result_cache') and cache_key in process_peptide_hit.result_cache:
-            cached_result = process_peptide_hit.result_cache[cache_key]
-            # Apply cached metas in the preserved order
-            for key, value in cached_result['meta']:
-                hit.setMetaValue(key, value)
-            # Restore score
-            hit.setScore(float(cached_result['score']))
-            if logger and logger.isEnabledFor(logging.INFO):
-                logger.info(f"Using cached result for: {original_seq_str}")
             return hit
         
         # Configure AScore parameters
-        ascore.fragment_mass_tolerance_ = args.fragment_mass_tolerance
-        ascore.fragment_tolerance_ppm_ = (args.fragment_mass_unit == 'ppm')
-        
-        if logger and logger.isEnabledFor(logging.INFO):
-            logger.info(f"Computing AScore for: {original_seq_str} (tolerance: {args.fragment_mass_tolerance} {args.fragment_mass_unit})")
+        ascore = AScore()
+        ascore.setFragmentMassTolerance(0.05)  # Default tolerance
+        ascore.setFragmentMassUnit('Da')
         
         # Execute AScore calculation
-        scored_hit = ascore.compute(hit, spectrum)
+        scored_hit = ascore.compute(sequence, spectrum)
         
         # Get the new sequence after AScore reassignment
-        new_seq_str = scored_hit.getSequence().toString()
+        new_sequence = scored_hit.getSequence()
+        new_seq_str = new_sequence.toString()
         
-        # Set the new sequence as the main sequence
-        hit.setSequence(scored_hit.getSequence())
-        
-        # Count phosphorylation sites
-        phospho_count = new_seq_str.count("(Phospho)")
-        
-        # Extract site-specific scores
-        site_scores = []
-        rank = 1
+        # Update the hit with new sequence if changed
+        if new_seq_str != original_seq_str:
+            hit.setSequence(new_sequence)
+            logger.debug(f"Sequence updated: {original_seq_str} -> {new_seq_str}")
         
         # Get existing AScore values
+        site_scores = []
+        rank = 1
         while scored_hit.metaValueExists(f"AScore_{rank}"):
             score = float(scored_hit.getMetaValue(f"AScore_{rank}"))
             site_scores.append(score)
             rank += 1
-            
-        # If we have fewer scores than phospho sites, add default scores
-        while len(site_scores) < phospho_count:
-            site_scores.append(1000.0)  # Default high confidence score
         
         # Get the AScore_pep_score (highest weighted peptide score)
         ascore_pep_score = float(scored_hit.getMetaValue("AScore_pep_score"))
         
         # Determine overall score (best AScore value, which is the minimum)
-        best_ascore = min(site_scores) if site_scores else -1.0
+        best_ascore = min(site_scores) if site_scores else ascore_pep_score
         
-        if logger and logger.isEnabledFor(logging.INFO):
-            logger.info(f"AScore computation complete:")
-            logger.info(f"  Original: {original_seq_str}")
-            logger.info(f"  New: {new_seq_str}")
-            logger.info(f"  Phospho sites: {phospho_count}")
-            logger.info(f"  Site scores: {site_scores}")
-            logger.info(f"  Best AScore: {best_ascore}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"AScore computation complete:")
+            logger.debug(f"  Original sequence: {original_seq_str}")
+            logger.debug(f"  New sequence: {new_seq_str}")
+            logger.debug(f"  Site scores: {site_scores}")
+            logger.debug(f"  Best AScore: {best_ascore}")
         
-        # Build meta fields in the required order
+        # Update meta values
         meta_fields = []
-        meta_fields.append(("search_engine_sequence", original_seq_str))
-        meta_fields.append(("regular_phospho_count", phospho_count))
-        meta_fields.append(("phospho_decoy_count", new_seq_str.count("(PhosphoDecoy)")))
         meta_fields.append(("AScore_pep_score", ascore_pep_score))
-        for i, score in enumerate(site_scores, 1):
-            meta_fields.append((f"AScore_{i}", score))
-        if scored_hit.metaValueExists("ProForma"):
-            meta_fields.append(("ProForma", scored_hit.getMetaValue("ProForma")))
-
-        # Cache results
-        if not hasattr(process_peptide_hit, 'result_cache'):
-            process_peptide_hit.result_cache = {}
-        process_peptide_hit.result_cache[cache_key] = {
-            'meta': meta_fields,
-            'score': best_ascore
-        }
         
-        # Preserve existing ProForma
-        proforma_value = None
-        if scored_hit.metaValueExists("ProForma"):
-            proforma_value = scored_hit.getMetaValue("ProForma")
-        elif hit.metaValueExists("ProForma"):
-            proforma_value = hit.getMetaValue("ProForma")
-
-        # Remove managed fields to re-insert them
-        for k in [
-            "search_engine_sequence",
-            "regular_phospho_count",
-            "phospho_decoy_count",
-            "AScore_pep_score",
-        ]:
-            if hit.metaValueExists(k):
-                try:
-                    hit.removeMetaValue(k)
-                except Exception:
-                    # Fallback: overwrite later if removal unsupported
-                    pass
-
-        # Remove any existing site-level AScore_* fields
-        i = 1
-        while hit.metaValueExists(f"AScore_{i}"):
-            try:
-                hit.removeMetaValue(f"AScore_{i}")
-            except Exception:
-                pass
-            i += 1
-
-        # Ensure ProForma will be appended last
-        if hit.metaValueExists("ProForma"):
-            try:
-                hit.removeMetaValue("ProForma")
-            except Exception:
-                pass
-
-        # Apply managed metadata (others are preserved)
-        for key, value in meta_fields:
-            hit.setMetaValue(key, value)
-        # Re-append preserved ProForma if available
-        if proforma_value is not None and not any(k == "ProForma" for k, _ in meta_fields):
-            hit.setMetaValue("ProForma", proforma_value)
+        for i, score in enumerate(site_scores):
+            meta_fields.append((f"AScore_{i}", score))
+        
+        # Apply meta values to hit
+        for field_name, value in meta_fields:
+            hit.setMetaValue(field_name, value)
         
         # Set the score to the best AScore value
         hit.setScore(best_ascore)
         
-        if logger and logger.isEnabledFor(logging.INFO):
-            logger.info(f"Successfully processed: {original_seq_str} -> {new_seq_str}")
-        
         return hit
         
     except Exception as e:
-        error_msg = f"Error processing {hit.getSequence().toString()}: {str(e)}"
-        print(error_msg)
-        if logger and logger.isEnabledFor(logging.ERROR):
-            logger.error(error_msg)
-        traceback.print_exc()
+        logger.error(f"Error processing peptide hit: {e}")
+        logger.error(traceback.format_exc())
+        # Set default values on error
+        hit.setMetaValue("AScore_pep_score", -1.0)
         return hit
 
-def process_peptide_identification(pid, exp, ascore, logger, add_decoys=False):
-    """Process a single peptide identification with error handling"""
+def process_peptide_identification(pid, exp, logger, add_decoys=False):
+    """
+    Process a peptide identification with all its hits.
+    
+    Args:
+        pid: PeptideIdentification to process
+        exp: MSExperiment containing spectra
+        logger: Logger instance
+        add_decoys: Whether to include decoy sites
+    
+    Returns:
+        Modified PeptideIdentification
+    """
     try:
-        # Create new PeptideIdentification
-        new_pid = PeptideIdentification(pid)
-        new_pid.setScoreType("PhosphoScore")
-        new_pid.setHigherScoreBetter(True)
-        new_pid.setSignificanceThreshold(0.0)
+        # Get spectrum for this peptide identification
+        target_mz = pid.getMZ()
+        target_rt = pid.getRT()
+        spectrum = find_spectrum_by_mz(exp, target_mz, target_rt)
         
-        if logger and logger.isEnabledFor(logging.INFO):
-            logger.info(f"Processing identification - MZ: {pid.getMZ():.4f}, RT: {pid.getRT():.2f}")
-        
-        # Find spectrum
-        spectrum = find_spectrum_by_mz(exp, pid.getMZ(), pid.getRT())
         if not spectrum:
-            error_msg = f"Error processing identification: spectrum_not_found for MZ {pid.getMZ()}"
-            if logger and logger.isEnabledFor(logging.ERROR):
-                logger.error(error_msg)
-            return {'status': 'error', 'reason': 'spectrum_not_found'}
+            logger.warning(f"No spectrum found for m/z={target_mz}, RT={target_rt}")
+            # Set default values for all hits
+            for hit in pid.getHits():
+                hit.setMetaValue("AScore_pep_score", -1.0)
+            return pid
         
-        if logger and logger.isEnabledFor(logging.INFO):
-            logger.info(f"Found spectrum: {spectrum.getNativeID()}")
-        
-        # Process peptide hits
-        scored_peptides = []
+        # Process each hit
         for hit in pid.getHits():
-            # Create new PeptideHit
-            new_hit = PeptideHit(hit)
-            # Process phosphorylation sites
-            processed_hit = process_peptide_hit(new_hit, spectrum, ascore, logger, add_decoys)
-            scored_peptides.append(processed_hit)
+            process_peptide_hit(hit, spectrum, logger)
         
-        # Set new hits
-        new_pid.setHits(scored_peptides)
-        
-        if logger and logger.isEnabledFor(logging.INFO):
-            logger.info(f"Successfully processed identification with {len(scored_peptides)} hits")
-        
-        return {'status': 'success', 'new_pid': new_pid}
+        return pid
         
     except Exception as e:
-        error_msg = f"Error processing identification: {str(e)}"
-        if logger and logger.isEnabledFor(logging.ERROR):
-            logger.error(error_msg)
-        return {'status': 'error', 'reason': str(e)}
+        logger.error(f"Error processing peptide identification: {e}")
+        logger.error(traceback.format_exc())
+        return pid
 
-def log_debug(log_file, enabled):
-    """Initialize debug logging only when enabled"""
-    logger = logging.getLogger('debug_logger')
-    # Clear existing handlers to avoid duplicates on repeated runs
-    if logger.handlers:
-        for h in list(logger.handlers):
-            logger.removeHandler(h)
-
-    if enabled:
-        logger.setLevel(logging.INFO)
-        handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
-        handler.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        # Ensure propagation is enabled
-        logger.propagate = False
-    else:
-        # Disable logging output when not in debug mode
-        logger.setLevel(logging.CRITICAL)
-        # Add a null handler to prevent "No handler found" warnings
-        logger.addHandler(logging.NullHandler())
-    return logger
-
-def main():
-    """Main workflow"""
+def process_peptide_identification_legacy(pid, exp, logger, add_decoys=False):
+    """
+    Legacy processing function for peptide identification.
+    This version maintains compatibility with existing code.
+    """
     try:
-        global args
-        args = parse_args()
+        # Get spectrum for this peptide identification
+        target_mz = pid.getMZ()
+        target_rt = pid.getRT()
+        spectrum = find_spectrum_by_mz(exp, target_mz, target_rt)
         
-        # Initialize processing pipeline
-        exp = load_spectra(args.in_file)
-        protein_ids, peptide_ids = load_identifications(args.id_file)
-        # Pre-initialize spectrum cache once in the main thread
-        if peptide_ids:
-            _ = find_spectrum_by_mz(exp, peptide_ids[0].getMZ(), peptide_ids[0].getRT())
+        if not spectrum:
+            logger.warning(f"No spectrum found for m/z={target_mz}, RT={target_rt}")
+            return pid
         
-        # Initialize debug log (only when -debug)
-        log_file = f"{args.out_file}.debug.log"
-        logger = log_debug(log_file, args.debug)
-        if args.debug:
-            logger.info("PhosphoScoring Debug Log")
-            logger.info(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            logger.info(f"Input file: {args.in_file}")
-            logger.info(f"Identification file: {args.id_file}")
-            logger.info(f"Output file: {args.out_file}")
-            logger.info(f"Fragment mass tolerance: {args.fragment_mass_tolerance} {args.fragment_mass_unit}")
-            logger.info(f"Threads: {args.threads}")
-            logger.info(f"Total spectra: {exp.size()}")
-            logger.info(f"Total identifications: {len(peptide_ids)}")
+        # Process each hit
+        for hit in pid.getHits():
+            try:
+                # Get peptide sequence
+                sequence = hit.getSequence()
+                original_seq_str = sequence.toString()
+                
+                # Check if peptide has phosphorylation sites
+                has_phospho = any('p' in str(seq.getModification()) for seq in sequence)
+                if not has_phospho:
+                    logger.debug(f"No phosphorylation sites found in {original_seq_str}")
+                    hit.setMetaValue("AScore_pep_score", -1.0)
+                    continue
+                
+                # Configure AScore parameters
+                ascore = AScore()
+                
+                # Execute AScore calculation
+                scored_hit = ascore.compute(sequence, spectrum)
+                
+                # Get the new sequence after AScore reassignment
+                new_sequence = scored_hit.getSequence()
+                new_seq_str = new_sequence.toString()
+                
+                # Update the hit with new sequence if changed
+                if new_seq_str != original_seq_str:
+                    hit.setSequence(new_sequence)
+                    logger.debug(f"Sequence updated: {original_seq_str} -> {new_seq_str}")
+                
+                # Get existing AScore values
+                site_scores = []
+                rank = 1
+                while scored_hit.metaValueExists(f"AScore_{rank}"):
+                    score = float(scored_hit.getMetaValue(f"AScore_{rank}"))
+                    site_scores.append(score)
+                    rank += 1
+                
+                # Get the AScore_pep_score (highest weighted peptide score)
+                ascore_pep_score = float(scored_hit.getMetaValue("AScore_pep_score"))
+                
+                # Determine overall score (best AScore value, which is the minimum)
+                best_ascore = min(site_scores) if site_scores else ascore_pep_score
+                
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(f"AScore computation complete:")
+                    logger.debug(f"  Original sequence: {original_seq_str}")
+                    logger.debug(f"  New sequence: {new_seq_str}")
+                    logger.debug(f"  Site scores: {site_scores}")
+                    logger.debug(f"  Best AScore: {best_ascore}")
+                
+                # Update meta values
+                meta_fields = []
+                meta_fields.append(("AScore_pep_score", ascore_pep_score))
+                
+                for i, score in enumerate(site_scores):
+                    meta_fields.append((f"AScore_{i}", score))
+                
+                # Apply meta values to hit
+                for field_name, value in meta_fields:
+                    hit.setMetaValue(field_name, value)
+                
+                # Set the score to the best AScore value
+                hit.setScore(best_ascore)
+                
+            except Exception as e:
+                logger.error(f"Error processing peptide hit: {e}")
+                logger.error(traceback.format_exc())
+                # Set default values on error
+                hit.setMetaValue("AScore_pep_score", -1.0)
         
-        # Processing statistics
-        stats = {
-            'total': len(peptide_ids),
-            'processed': 0,
-            'phospho': 0,
-            'errors': 0
-        }
-        
-        # Main processing loop
-        start_time = time.time()
-        processed_peptide_ids = []
-        
-        # Process each PeptideIdentification (optionally in parallel)
-        if max(1, int(args.threads)) == 1:
-            if logger and logger.isEnabledFor(logging.INFO):
-                logger.info("Starting sequential processing")
-            
-            for i, pid in enumerate(peptide_ids):
-                try:
-                    if logger and logger.isEnabledFor(logging.INFO):
-                        logger.info(f"Processing identification {i+1}/{len(peptide_ids)}")
-                    
-                    # Create a fresh AScore per task to avoid shared state
-                    result = process_peptide_identification(pid, exp, AScore(), logger, args.add_decoys)
-                    if result['status'] == 'success':
-                        processed_peptide_ids.append(result['new_pid'])
-                        stats['processed'] += 1
-                        phospho_count = len([h for h in result['new_pid'].getHits() 
-                                          if "(Phospho)" in h.getSequence().toString()])
-                        stats['phospho'] += phospho_count
-                        
-                        if logger and logger.isEnabledFor(logging.INFO):
-                            logger.info(f"Successfully processed identification {i+1} with {phospho_count} phosphorylated hits")
-                    else:
-                        stats['errors'] += 1
-                        error_msg = f"Error processing identification: {result['reason']}"
-                        if logger and logger.isEnabledFor(logging.ERROR):
-                            logger.error(error_msg)
-                except Exception as e:
-                    stats['errors'] += 1
-                    error_msg = f"Error processing identification: {str(e)}"
-                    if logger and logger.isEnabledFor(logging.ERROR):
-                        logger.error(error_msg)
-                    traceback.print_exc()
-        else:
-            workers = max(1, int(args.threads))
-            print(f"[{time.strftime('%H:%M:%S')}] Parallel execution with {workers} processes")
-            
-            if logger and logger.isEnabledFor(logging.INFO):
-                logger.info(f"Starting parallel processing with {workers} workers")
-
-            # Build serializable tasks
-            params = {
-                'fragment_mass_tolerance': args.fragment_mass_tolerance,
-                'fragment_mass_unit': args.fragment_mass_unit,
-                'add_decoys': args.add_decoys,
-            }
-            tasks = []
-            for idx, pid in enumerate(peptide_ids):
-                hit_payloads = []
-                for hit in pid.getHits():
-                    seq_str = hit.getSequence().toString()
-                    proforma = hit.getMetaValue('ProForma') if hit.metaValueExists('ProForma') else None
-                    hit_payloads.append({'sequence': seq_str, 'proforma': proforma})
-                tasks.append({
-                    'idx': idx,
-                    'mzml_path': args.in_file,
-                    'params': params,
-                    'pid': {
-                        'mz': pid.getMZ(),
-                        'rt': pid.getRT(),
-                        'hits': hit_payloads,
-                    }
-                })
-
-            if logger and logger.isEnabledFor(logging.INFO):
-                logger.info(f"Created {len(tasks)} parallel tasks")
-
-            indexed_results = {}
-            with ProcessPoolExecutor(max_workers=workers) as executor:
-                futures = {executor.submit(_worker_process_pid, t): t['idx'] for t in tasks}
-                for fut in as_completed(futures):
-                    idx = futures[fut]
-                    try:
-                        indexed_results[idx] = fut.result()
-                    except Exception as e:
-                        indexed_results[idx] = {'status': 'error', 'reason': str(e)}
-
-            if logger and logger.isEnabledFor(logging.INFO):
-                logger.info("Parallel processing completed, rebuilding results")
-
-            # Rebuild PeptideIdentification objects in order
-            for idx in range(len(peptide_ids)):
-                res = indexed_results.get(idx, {'status': 'error', 'reason': 'unknown'})
-                pid_src = peptide_ids[idx]
-                if res['status'] == 'success':
-                    new_pid = PeptideIdentification(pid_src)
-                    new_pid.setScoreType("PhosphoScore")
-                    new_pid.setHigherScoreBetter(True)
-                    new_pid.setSignificanceThreshold(0.0)
-
-                    new_hits = []
-                    for hit_src, hit_res in zip(pid_src.getHits(), res['hits']):
-                        new_hit = PeptideHit(hit_src)
-                        new_hit.setSequence(AASequence.fromString(hit_res['new_sequence']))
-                        # Clear managed metas then set in order
-                        for k in [
-                            'search_engine_sequence', 'regular_phospho_count', 'phospho_decoy_count',
-                            'AScore_pep_score'
-                        ]:
-                            if new_hit.metaValueExists(k):
-                                try:
-                                    new_hit.removeMetaValue(k)
-                                except Exception:
-                                    pass
-                        i = 1
-                        while new_hit.metaValueExists(f"AScore_{i}"):
-                            try:
-                                new_hit.removeMetaValue(f"AScore_{i}")
-                            except Exception:
-                                pass
-                            i += 1
-
-                        if new_hit.metaValueExists('ProForma'):
-                            try:
-                                new_hit.removeMetaValue('ProForma')
-                            except Exception:
-                                pass
-
-                        for k, v in hit_res['meta_fields']:
-                            new_hit.setMetaValue(k, v)
-                        new_hit.setScore(hit_res['best_ascore'])
-                        new_hits.append(new_hit)
-
-                    new_pid.setHits(new_hits)
-                    processed_peptide_ids.append(new_pid)
-                    stats['processed'] += 1
-                    phospho_count = len([h for h in new_pid.getHits() if "(Phospho)" in h.getSequence().toString()])
-                    stats['phospho'] += phospho_count
-                    
-                    if logger and logger.isEnabledFor(logging.INFO):
-                        logger.info(f"Rebuilt identification {idx+1} with {phospho_count} phosphorylated hits")
-                else:
-                    stats['errors'] += 1
-                    error_msg = f"Error processing identification: {res.get('reason', 'unknown')}"
-                    if logger and logger.isEnabledFor(logging.ERROR):
-                        logger.error(error_msg)
-        
-        # Generate final report
-        elapsed = time.time() - start_time
-        print(f"\nProcessing Complete:")
-        print(f"  Total identifications: {stats['total']}")
-        print(f"  Successfully processed: {stats['processed']}")
-        print(f"  Phosphorylated peptides: {stats['phospho']}")
-        print(f"  Processing errors: {stats['errors']}")
-        print(f"  Time elapsed: {elapsed:.2f} seconds")
-        print(f"  Processing speed: {stats['processed']/elapsed:.2f} IDs/second")
-        if args.debug:
-            print(f"  Debug log saved to: {log_file}")
-        
-        if logger and logger.isEnabledFor(logging.INFO):
-            logger.info("Processing completed successfully")
-            logger.info(f"Final statistics: {stats}")
-            logger.info(f"Total time: {elapsed:.2f} seconds")
-            logger.info(f"Processing speed: {stats['processed']/elapsed:.2f} IDs/second")
-        
-        # Save results
-        save_identifications(args.out_file, protein_ids, processed_peptide_ids)
+        return pid
         
     except Exception as e:
-        error_msg = f"Fatal error: {str(e)}"
-        print(error_msg)
-        if logger and logger.isEnabledFor(logging.ERROR):
-            logger.error(error_msg)
-        traceback.print_exc()
-        sys.exit(1)
+        logger.error(f"Error processing peptide identification: {e}")
+        logger.error(traceback.format_exc())
+        return pid
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
