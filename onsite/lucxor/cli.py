@@ -12,7 +12,6 @@ import json
 from typing import Dict, List, Optional, Tuple
 from collections import defaultdict
 
-import numpy as np
 from pyopenms import (
     IdXMLFile,
     MzMLFile,
@@ -157,7 +156,7 @@ logger = logging.getLogger(__name__)
     type=str,
     help="Log file path (only used in debug mode, default: {output_base}_debug.log)",
 )
-def main(
+def lucxor(
     input_spectrum,
     input_id,
     output,
@@ -264,7 +263,6 @@ def setup_logging(debug, log_file, output):
         root_logger.addHandler(file_handler)
 
     # Set third-party library log levels
-    logging.getLogger("numpy").setLevel(logging.WARNING)
     logging.getLogger("scipy").setLevel(logging.WARNING)
 
 
@@ -518,6 +516,11 @@ class PyLuciPHOr2:
         # Save to file
         IdXMLFile().store(output_file, prot_ids, pep_ids)
         self.logger.info(f"Results saved to {output_file}")
+
+
+def main():
+    """Entry point for standalone LucXor CLI."""
+    lucxor()
 
 
 if __name__ == "__main__":

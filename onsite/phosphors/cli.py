@@ -69,7 +69,7 @@ from .phosphors import calculate_phospho_localization_compomics_style
     default=False,
     help="Include A (PhosphoDecoy) as potential phosphorylation site",
 )
-def main(
+def phosphors(
     in_file,
     id_file,
     out_file,
@@ -643,6 +643,11 @@ def log_debug(log_file, enabled):
             logger.error(f"Error: {str(e)}")
             logger.error(traceback.format_exc())
         sys.exit(1)
+
+
+def main():
+    """Entry point for standalone PhosphoRS CLI."""
+    phosphors()
 
 
 if __name__ == "__main__":

@@ -70,7 +70,7 @@ from .ascore import AScore
     default=False,
     help="Include A (PhosphoDecoy) as potential phosphorylation site",
 )
-def main(
+def ascore(
     in_file,
     id_file,
     out_file,
@@ -524,6 +524,11 @@ def process_peptide_identification_legacy(pid, exp, logger, add_decoys=False):
         logger.error(f"Error processing peptide identification: {e}")
         logger.error(traceback.format_exc())
         return pid
+
+
+def main():
+    """Entry point for standalone AScore CLI."""
+    ascore()
 
 
 if __name__ == "__main__":
