@@ -7,4 +7,4 @@ post-translational modification localization.
 
 from .ascore import AScore
 
-__all__ = ['AScore']
+__all__ = ["AScore"]
