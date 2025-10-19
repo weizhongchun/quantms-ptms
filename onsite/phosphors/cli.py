@@ -85,8 +85,56 @@ def phosphors(
     This tool processes MS/MS spectra and peptide identifications to localize
     phosphorylation sites using the PhosphoRS algorithm.
     """
+    # Initialize logging
+    if debug:
+        logging.basicConfig(
+            filename="phosphors_debug.log",
+            level=logging.DEBUG,
+            format="%(asctime)s %(levelname)s %(message)s",
+        )
+        logging.debug("Debug logging enabled.")
+    else:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
+    start_time = time.time()
+    logging.info("Starting PhosphoRS CLI")
 
+    # Load spectra and identifications
+    spectra = load_spectra(in_file)
+    protein_ids, peptide_ids = load_identifications(id_file)
+
+    # Process peptide identifications
+    processed_peptide_ids = []
+    logging.info(f"Processing {len(peptide_ids)} peptide identifications")
+
+    def process_pep_id(pep_id):
+        try:
+            return calculate_phospho_localization_compomics_style(
+                pep_id,
+                spectra,
+                fragment_mass_tolerance,
+                fragment_mass_unit,
+                add_decoys,
+            )
+        except Exception as e:
+            logging.error(f"Error processing peptide: {pep_id.getSequence()}: {e}")
+            traceback.print_exc()
+            return pep_id
+
+    if threads > 1:
+        with ProcessPoolExecutor(max_workers=threads) as executor:
+            future_to_pep = {executor.submit(process_pep_id, pep_id): pep_id for pep_id in peptide_ids}
+            for future in as_completed(future_to_pep):
+                result = future.result()
+                processed_peptide_ids.append(result)
+    else:
+        for pep_id in peptide_ids:
+            processed_peptide_ids.append(process_pep_id(pep_id))
+
+    # Save results
+    save_identifications(out_file, protein_ids, processed_peptide_ids)
+    elapsed = time.time() - start_time
+    logging.info(f"Finished. Results written to {out_file}. Elapsed time: {elapsed:.2f}s")
 def load_spectra(mzml_file):
     """Load MS/MS spectra with progress feedback"""
     print(f"[{time.strftime('%H:%M:%S')}] Loading spectra from {mzml_file}")
