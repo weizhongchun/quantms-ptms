@@ -85,56 +85,201 @@ def phosphors(
     This tool processes MS/MS spectra and peptide identifications to localize
     phosphorylation sites using the PhosphoRS algorithm.
     """
-    # Initialize logging
-    if debug:
-        logging.basicConfig(
-            filename="phosphors_debug.log",
-            level=logging.DEBUG,
-            format="%(asctime)s %(levelname)s %(message)s",
-        )
-        logging.debug("Debug logging enabled.")
-    else:
-        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    try:
+        # Initialize processing pipeline
+        exp = load_spectra(in_file)
+        protein_ids, peptide_ids = load_identifications(id_file)
+        # Prime spectrum cache
+        if peptide_ids:
+            _ = find_spectrum_by_mz(exp, peptide_ids[0].getMZ(), peptide_ids[0].getRT())
 
-    start_time = time.time()
-    logging.info("Starting PhosphoRS CLI")
-
-    # Load spectra and identifications
-    spectra = load_spectra(in_file)
-    protein_ids, peptide_ids = load_identifications(id_file)
-
-    # Process peptide identifications
-    processed_peptide_ids = []
-    logging.info(f"Processing {len(peptide_ids)} peptide identifications")
-
-    def process_pep_id(pep_id):
-        try:
-            return calculate_phospho_localization_compomics_style(
-                pep_id,
-                spectra,
-                fragment_mass_tolerance,
-                fragment_mass_unit,
-                add_decoys,
+        # Initialize debug log (only when --debug)
+        log_file = f"{out_file}.debug.log"
+        logger = log_debug(log_file, debug)
+        if debug:
+            logger.info("PhosphoRSScoring Debug Log")
+            logger.info(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            logger.info(f"Input file: {in_file}")
+            logger.info(f"Identification file: {id_file}")
+            logger.info(f"Output file: {out_file}")
+            logger.info(
+                f"Fragment mass tolerance: {fragment_mass_tolerance} {fragment_mass_unit}"
             )
-        except Exception as e:
-            logging.error(f"Error processing peptide: {pep_id.getSequence()}: {e}")
-            traceback.print_exc()
-            return pep_id
+            logger.info(f"Threads: {threads}")
+            logger.info(f"Add decoys: {add_decoys}")
+            logger.info(f"Total spectra: {exp.size()}")
+            logger.info(f"Total identifications: {len(peptide_ids)}")
 
-    if threads > 1:
-        with ProcessPoolExecutor(max_workers=threads) as executor:
-            future_to_pep = {executor.submit(process_pep_id, pep_id): pep_id for pep_id in peptide_ids}
-            for future in as_completed(future_to_pep):
-                result = future.result()
-                processed_peptide_ids.append(result)
-    else:
-        for pep_id in peptide_ids:
-            processed_peptide_ids.append(process_pep_id(pep_id))
+        # Processing statistics
+        stats = {"total": len(peptide_ids), "processed": 0, "phospho": 0, "errors": 0}
 
-    # Save results
-    save_identifications(out_file, protein_ids, processed_peptide_ids)
-    elapsed = time.time() - start_time
-    logging.info(f"Finished. Results written to {out_file}. Elapsed time: {elapsed:.2f}s")
+        start_time = time.time()
+        processed_peptide_ids = []
+
+        # Sequential or parallel processing
+        if max(1, int(threads)) == 1:
+            for i, pid in enumerate(peptide_ids):
+                try:
+                    result = process_peptide_identification(pid, exp, logger)
+                    if result["status"] == "success":
+                        processed_peptide_ids.append(result["new_pid"])
+                        stats["processed"] += 1
+                        stats["phospho"] += len(
+                            [
+                                h
+                                for h in result["new_pid"].getHits()
+                                if "(Phospho)" in h.getSequence().toString()
+                            ]
+                        )
+                    else:
+                        stats["errors"] += 1
+                        if debug:
+                            logger.error(
+                                f"Error processing identification: {result['reason']}"
+                            )
+                except Exception as e:
+                    stats["errors"] += 1
+                    if debug:
+                        logger.error(f"Error processing identification: {str(e)}")
+                    traceback.print_exc()
+        else:
+            workers = max(1, int(threads))
+            print(
+                f"[{time.strftime('%H:%M:%S')}] Parallel execution with {workers} processes"
+            )
+            if debug:
+                logger.info(f"Starting parallel processing with {workers} workers")
+
+            params = {
+                "fragment_mass_tolerance": fragment_mass_tolerance,
+                "fragment_mass_unit": fragment_mass_unit,
+                "add_decoys": bool(add_decoys),
+            }
+            tasks = []
+            for idx, pid in enumerate(peptide_ids):
+                hit_payloads = []
+                for hit in pid.getHits():
+                    seq_str = hit.getSequence().toString()
+                    proforma = (
+                        hit.getMetaValue("ProForma")
+                        if hit.metaValueExists("ProForma")
+                        else None
+                    )
+                    hit_payloads.append({"sequence": seq_str, "proforma": proforma})
+                tasks.append(
+                    {
+                        "idx": idx,
+                        "mzml_path": in_file,
+                        "params": params,
+                        "pid": {
+                            "mz": pid.getMZ(),
+                            "rt": pid.getRT(),
+                            "hits": hit_payloads,
+                        },
+                    }
+                )
+
+            indexed_results = {}
+            with ProcessPoolExecutor(max_workers=workers) as executor:
+                futures = {
+                    executor.submit(_worker_process_pid, t): t["idx"] for t in tasks
+                }
+                for fut in as_completed(futures):
+                    idx = futures[fut]
+                    try:
+                        indexed_results[idx] = fut.result()
+                    except Exception as e:
+                        indexed_results[idx] = {"status": "error", "reason": str(e)}
+
+            # Rebuild results in order
+            for idx in range(len(peptide_ids)):
+                res = indexed_results.get(idx, {"status": "error", "reason": "unknown"})
+                pid_src = peptide_ids[idx]
+                if res["status"] == "success":
+                    new_pid = PeptideIdentification(pid_src)
+                    new_pid.setScoreType("PhosphoRSScore")
+                    new_pid.setHigherScoreBetter(False)
+                    new_pid.setSignificanceThreshold(0.0)
+
+                    new_hits = []
+                    for hit_src, hit_res in zip(pid_src.getHits(), res["hits"]):
+                        if hit_res.get("status") != "success":
+                            # Preserve original hit with -1 score when failed
+                            failed_hit = PeptideHit(hit_src)
+                            failed_hit.setScore(-1.0)
+                            new_hits.append(failed_hit)
+                            continue
+
+                        new_hit = PeptideHit(hit_src)
+                        new_hit.setSequence(
+                            AASequence.fromString(hit_res["new_sequence"])
+                        )
+                        # Clear managed metas
+                        for k in [
+                            "search_engine_sequence",
+                            "regular_phospho_count",
+                            "phospho_decoy_count",
+                            "PhosphoRS_pep_score",
+                            "PhosphoRS_site_probs",
+                            "SpecEValue_score",
+                        ]:
+                            if new_hit.metaValueExists(k):
+                                try:
+                                    new_hit.removeMetaValue(k)
+                                except Exception:
+                                    pass
+                        if new_hit.metaValueExists("ProForma"):
+                            try:
+                                new_hit.removeMetaValue("ProForma")
+                            except Exception:
+                                pass
+                        for k, v in hit_res["meta_fields"]:
+                            new_hit.setMetaValue(k, v)
+                        new_hit.setScore(float(hit_res["score"]))
+                        new_hits.append(new_hit)
+
+                    new_pid.setHits(new_hits)
+                    processed_peptide_ids.append(new_pid)
+                    stats["processed"] += 1
+                    stats["phospho"] += len(
+                        [
+                            h
+                            for h in new_pid.getHits()
+                            if "(Phospho)" in h.getSequence().toString()
+                        ]
+                    )
+                else:
+                    stats["errors"] += 1
+                    if debug:
+                        logger.error(
+                            f"Error processing identification: {res.get('reason', 'unknown')}"
+                        )
+
+        # Report
+        elapsed = time.time() - start_time
+        print(f"\nProcessing Complete:")
+        print(f"  Total identifications: {stats['total']}")
+        print(f"  Successfully processed: {stats['processed']}")
+        print(f"  Phosphorylated peptides: {stats['phospho']}")
+        print(f"  Processing errors: {stats['errors']}")
+        print(f"  Time elapsed: {elapsed:.2f} seconds")
+        print(f"  Processing speed: {stats['processed']/elapsed:.2f} IDs/second")
+        if debug:
+            print(f"  Debug log saved to: {log_file}")
+
+        # Save results
+        save_identifications(out_file, protein_ids, processed_peptide_ids)
+
+    except KeyboardInterrupt:
+        click.echo("\nOperation cancelled by user")
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {str(e)}")
+        if debug:
+            logger.error(f"Error: {str(e)}")
+            logger.error(traceback.format_exc())
+        sys.exit(1)
+
 def load_spectra(mzml_file):
     """Load MS/MS spectra with progress feedback"""
     print(f"[{time.strftime('%H:%M:%S')}] Loading spectra from {mzml_file}")
@@ -496,201 +641,6 @@ def log_debug(log_file, enabled):
         logger.setLevel(logging.CRITICAL)
         logger.addHandler(logging.NullHandler())
     return logger
-
-    try:
-        # Initialize processing pipeline
-        exp = load_spectra(in_file)
-        protein_ids, peptide_ids = load_identifications(id_file)
-        # Prime spectrum cache
-        if peptide_ids:
-            _ = find_spectrum_by_mz(exp, peptide_ids[0].getMZ(), peptide_ids[0].getRT())
-
-        # Initialize debug log (only when --debug)
-        log_file = f"{out_file}.debug.log"
-        logger = log_debug(log_file, debug)
-        if debug:
-            logger.info("PhosphoRSScoring Debug Log")
-            logger.info(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            logger.info(f"Input file: {in_file}")
-            logger.info(f"Identification file: {id_file}")
-            logger.info(f"Output file: {out_file}")
-            logger.info(
-                f"Fragment mass tolerance: {fragment_mass_tolerance} {fragment_mass_unit}"
-            )
-            logger.info(f"Threads: {threads}")
-            logger.info(f"Add decoys: {add_decoys}")
-            logger.info(f"Total spectra: {exp.size()}")
-            logger.info(f"Total identifications: {len(peptide_ids)}")
-
-        # Processing statistics
-        stats = {"total": len(peptide_ids), "processed": 0, "phospho": 0, "errors": 0}
-
-        start_time = time.time()
-        processed_peptide_ids = []
-
-        # Sequential or parallel processing
-        if max(1, int(threads)) == 1:
-            for i, pid in enumerate(peptide_ids):
-                try:
-                    result = process_peptide_identification(pid, exp, logger)
-                    if result["status"] == "success":
-                        processed_peptide_ids.append(result["new_pid"])
-                        stats["processed"] += 1
-                        stats["phospho"] += len(
-                            [
-                                h
-                                for h in result["new_pid"].getHits()
-                                if "(Phospho)" in h.getSequence().toString()
-                            ]
-                        )
-                    else:
-                        stats["errors"] += 1
-                        if debug:
-                            logger.error(
-                                f"Error processing identification: {result['reason']}"
-                            )
-                except Exception as e:
-                    stats["errors"] += 1
-                    if debug:
-                        logger.error(f"Error processing identification: {str(e)}")
-                    traceback.print_exc()
-        else:
-            workers = max(1, int(threads))
-            print(
-                f"[{time.strftime('%H:%M:%S')}] Parallel execution with {workers} processes"
-            )
-            if debug:
-                logger.info(f"Starting parallel processing with {workers} workers")
-
-            params = {
-                "fragment_mass_tolerance": fragment_mass_tolerance,
-                "fragment_mass_unit": fragment_mass_unit,
-                "add_decoys": bool(add_decoys),
-            }
-            tasks = []
-            for idx, pid in enumerate(peptide_ids):
-                hit_payloads = []
-                for hit in pid.getHits():
-                    seq_str = hit.getSequence().toString()
-                    proforma = (
-                        hit.getMetaValue("ProForma")
-                        if hit.metaValueExists("ProForma")
-                        else None
-                    )
-                    hit_payloads.append({"sequence": seq_str, "proforma": proforma})
-                tasks.append(
-                    {
-                        "idx": idx,
-                        "mzml_path": in_file,
-                        "params": params,
-                        "pid": {
-                            "mz": pid.getMZ(),
-                            "rt": pid.getRT(),
-                            "hits": hit_payloads,
-                        },
-                    }
-                )
-
-            indexed_results = {}
-            with ProcessPoolExecutor(max_workers=workers) as executor:
-                futures = {
-                    executor.submit(_worker_process_pid, t): t["idx"] for t in tasks
-                }
-                for fut in as_completed(futures):
-                    idx = futures[fut]
-                    try:
-                        indexed_results[idx] = fut.result()
-                    except Exception as e:
-                        indexed_results[idx] = {"status": "error", "reason": str(e)}
-
-            # Rebuild results in order
-            for idx in range(len(peptide_ids)):
-                res = indexed_results.get(idx, {"status": "error", "reason": "unknown"})
-                pid_src = peptide_ids[idx]
-                if res["status"] == "success":
-                    new_pid = PeptideIdentification(pid_src)
-                    new_pid.setScoreType("PhosphoRSScore")
-                    new_pid.setHigherScoreBetter(False)
-                    new_pid.setSignificanceThreshold(0.0)
-
-                    new_hits = []
-                    for hit_src, hit_res in zip(pid_src.getHits(), res["hits"]):
-                        if hit_res.get("status") != "success":
-                            # Preserve original hit with -1 score when failed
-                            failed_hit = PeptideHit(hit_src)
-                            failed_hit.setScore(-1.0)
-                            new_hits.append(failed_hit)
-                            continue
-
-                        new_hit = PeptideHit(hit_src)
-                        new_hit.setSequence(
-                            AASequence.fromString(hit_res["new_sequence"])
-                        )
-                        # Clear managed metas
-                        for k in [
-                            "search_engine_sequence",
-                            "regular_phospho_count",
-                            "phospho_decoy_count",
-                            "PhosphoRS_pep_score",
-                            "PhosphoRS_site_probs",
-                            "SpecEValue_score",
-                        ]:
-                            if new_hit.metaValueExists(k):
-                                try:
-                                    new_hit.removeMetaValue(k)
-                                except Exception:
-                                    pass
-                        if new_hit.metaValueExists("ProForma"):
-                            try:
-                                new_hit.removeMetaValue("ProForma")
-                            except Exception:
-                                pass
-                        for k, v in hit_res["meta_fields"]:
-                            new_hit.setMetaValue(k, v)
-                        new_hit.setScore(float(hit_res["score"]))
-                        new_hits.append(new_hit)
-
-                    new_pid.setHits(new_hits)
-                    processed_peptide_ids.append(new_pid)
-                    stats["processed"] += 1
-                    stats["phospho"] += len(
-                        [
-                            h
-                            for h in new_pid.getHits()
-                            if "(Phospho)" in h.getSequence().toString()
-                        ]
-                    )
-                else:
-                    stats["errors"] += 1
-                    if debug:
-                        logger.error(
-                            f"Error processing identification: {res.get('reason', 'unknown')}"
-                        )
-
-        # Report
-        elapsed = time.time() - start_time
-        print(f"\nProcessing Complete:")
-        print(f"  Total identifications: {stats['total']}")
-        print(f"  Successfully processed: {stats['processed']}")
-        print(f"  Phosphorylated peptides: {stats['phospho']}")
-        print(f"  Processing errors: {stats['errors']}")
-        print(f"  Time elapsed: {elapsed:.2f} seconds")
-        print(f"  Processing speed: {stats['processed']/elapsed:.2f} IDs/second")
-        if debug:
-            print(f"  Debug log saved to: {log_file}")
-
-        # Save results
-        save_identifications(out_file, protein_ids, processed_peptide_ids)
-
-    except KeyboardInterrupt:
-        click.echo("\nOperation cancelled by user")
-        sys.exit(1)
-    except Exception as e:
-        click.echo(f"Error: {str(e)}")
-        if debug:
-            logger.error(f"Error: {str(e)}")
-            logger.error(traceback.format_exc())
-        sys.exit(1)
 
 
 def main():
