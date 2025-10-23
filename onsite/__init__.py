@@ -16,16 +16,12 @@ from .phosphors import calculate_phospho_localization_compomics_style
 # Import LucXor components
 try:
     from . import lucxor
+
     LUCXOR_AVAILABLE = True
 except ImportError:
     LUCXOR_AVAILABLE = False
 
-__all__ = [
-    "AScore",
-    "calculate_phospho_localization_compomics_style"
-]
+__all__ = ["AScore", "calculate_phospho_localization_compomics_style"]
 
 if LUCXOR_AVAILABLE:
-    __all__.extend([
-        "lucxor"
-    ])
+    __all__.extend(["lucxor"])
