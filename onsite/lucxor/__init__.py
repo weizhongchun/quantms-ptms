@@ -28,7 +28,7 @@ def __getattr__(name):
         from .models import CIDModel, HCDModel
 
         return locals()[name]
-    raise AttributeError(f"module 'lucxor' has no attribute '{name}'")
+    raise AttributeError(f"module \"lucxor\" has no attribute \"{name}\"")
 
 
 __all__ = ["LucXor", "PyLuciPHOr2", "Peptide", "PSM", "CIDModel", "HCDModel"]

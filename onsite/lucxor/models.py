@@ -516,7 +516,7 @@ class ModelData_HCD:
         Estimate non-parametric density - intensity, using NumPy vectorized operations to optimize calculation speed
 
         Args:
-            ion_type: Ion type ('b', 'y', 'n')
+            ion_type: Ion type ("b", "y", "n")
         """
         start_time = time.time()
 
@@ -604,7 +604,7 @@ class ModelData_HCD:
             self.y_tick_marks_int = tick_marks_int
             self.f_int_y = f_int
             self.y_int_bw = bw
-        else:  # 'n'
+        else:  # "n"
             self.neg_tick_marks_int = tick_marks_int
             self.f_int_neg = f_int
             self.neg_int_bw = bw
@@ -689,7 +689,7 @@ class ModelData_HCD:
         Get log non-parametric density of intensity using optimized lookup
 
         Args:
-            ion_type: Ion type ('b', 'y', 'n')
+            ion_type: Ion type ("b", "y", "n")
             x: Intensity value
 
         Returns:
@@ -961,7 +961,7 @@ class CIDModel:
         Get log non-parametric density of intensity
 
         Args:
-            ion_type: Ion type ('b', 'y', 'n')
+            ion_type: Ion type ("b", "y", "n")
             x: Intensity value
             charge: Charge state, uses default if None
 
@@ -1201,7 +1201,7 @@ class HCDModel:
         Get log non-parametric density of intensity
 
         Args:
-            ion_type: Ion type ('b', 'y', 'n')
+            ion_type: Ion type ("b", "y", "n")
             x: Intensity value
             charge: Charge state, uses default if None
 

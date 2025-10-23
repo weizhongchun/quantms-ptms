@@ -34,9 +34,11 @@ Documentation = "https://github.com/bigbio/onsite"
 
 [project.scripts]
 onsite = "onsite.onsitec:main"
-phospho-scoring = "onsite.phospho_scoring:main"
-phosphors-scoring = "onsite.phosphors_scoring:main"
+ascore = "onsite.ascore.cli:main"
+phosphors = "onsite.phosphors.cli:main"
 lucxor = "onsite.lucxor.cli:main"
+phospho-scoring = "onsite.ascore.cli:main"
+phosphors-scoring = "onsite.phosphors.cli:main"
 
 [tool.poetry]
 packages = [{include = "onsite"}]

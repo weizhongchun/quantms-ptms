@@ -496,7 +496,7 @@ class PSM:
                 self.local_flr = 1.0
 
         # Save final scores - use values already calculated in score_permutations
-        # Only recalculate if score_permutations didn't calculate successfully
+        # Only recalculate if score_permutations didn"t calculate successfully
         if self.delta_score == 0.0 and self.psm_score == 0.0:
             real_scores = list(self.pos_permutation_score_map.values())
             if real_scores:
@@ -652,7 +652,7 @@ class PSM:
 
             # Score each permutation
             for perm in all_perms:
-                # Check if it's a decoy sequence
+                # Check if it"s a decoy sequence
                 is_decoy = self._is_decoy_sequence(perm)
 
                 if is_decoy:
@@ -1319,7 +1319,7 @@ class PSM:
             sequence: Sequence to check
 
         Returns:
-            bool: Returns True if it's a valid decoy sequence
+            bool: Returns True if it"s a valid decoy sequence
         """
         try:
             # Check if it contains decoy amino acid symbols
@@ -1380,7 +1380,7 @@ class PSM:
             sequence: Peptide sequence
 
         Returns:
-            bool: Whether it's a decoy sequence
+            bool: Whether it"s a decoy sequence
         """
         # Check if the sequence contains decoy marker characters
         decoy_chars = set("@#$%^&*()_+{}|:\"<>?~`-=[]\\;',./")

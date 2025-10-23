@@ -135,7 +135,7 @@ def binomial_tail_probability(k: int, n: int, p: float) -> float:
     if p in _distribution_cache and n in _distribution_cache[p]:
         cached_prob = _distribution_cache[p][n]
         # For cached results, we need to recalculate based on k
-        # This is a simplified approach - in practice, we'd cache the full distribution
+        # This is a simplified approach - in practice, we"d cache the full distribution
         pass  # Continue with calculation
 
     # For very small probabilities, use log-space calculation to maintain precision
@@ -185,7 +185,7 @@ def binomial_tail_probability(k: int, n: int, p: float) -> float:
 
         # Convert back to linear space
         prob = math.exp(log_prob)
-        # Don't truncate to 1e-15 - keep the actual small probability
+        # Don"t truncate to 1e-15 - keep the actual small probability
         return prob
 
     # For normal cases, use scipy if available
@@ -814,10 +814,10 @@ def _reduce_by_delta_selection(
     return _copy_spectrum_subset(filtered_spec, reduced_idx)
 
 
-# --- Helper: Calculate Occurrence Probability 'p' ---
+# --- Helper: Calculate Occurrence Probability "p" ---
 def get_occurrence_probability(exp_spectrum: MSSpectrum, tolerance_da: float) -> float:
     """
-    Calculates the probability 'p' of matching a single theoretical peak
+    Calculates the probability "p" of matching a single theoretical peak
     to any experimental peak by chance.
 
     Args:
@@ -825,7 +825,7 @@ def get_occurrence_probability(exp_spectrum: MSSpectrum, tolerance_da: float) ->
         tolerance_da: The fragment tolerance in Daltons.
 
     Returns:
-        The occurrence probability 'p'. Returns MIN_PROBABILITY if spectrum is empty or range is invalid.
+        The occurrence probability "p". Returns MIN_PROBABILITY if spectrum is empty or range is invalid.
     """
     try:
         peaks = exp_spectrum.get_peaks()  # Get (mz, intensity) tuples

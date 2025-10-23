@@ -437,20 +437,20 @@ class Peptide:
     def _get_neutral_losses(self, ion_str, ion_type="b", only_main_ion=False):
         """
         Return neutral loss list
-        Only extend main ion names, avoid extending ion names with '-'.
+        Only extend main ion names, avoid extending ion names with "-".
         """
         nl_list = []
-        # Only extend main ion names (without '-')
-        # Main ion name definition: after ':' to '/+' or end, without '-'
+        # Only extend main ion names (without "-")
+        # Main ion name definition: after ":" to "/+" or end, without "-"
         colon_idx = ion_str.find(":")
         if colon_idx == -1:
             return nl_list
         # Find /+ position
         slash_idx = ion_str.find("/+", colon_idx)
         dash_idx = ion_str.find("-", colon_idx)
-        # If there's '-' after ':' to '/+' or before '-', it's not a main ion name
+        # If there"s "-" after ":" to "/+" or before "-", it"s not a main ion name
         if only_main_ion:
-            # Only allow no '-' between after ':' to '/+' or end
+            # Only allow no "-" between after ":" to "/+" or end
             end_idx = len(ion_str)
             if slash_idx != -1 and (dash_idx == -1 or slash_idx < dash_idx):
                 end_idx = slash_idx
@@ -591,7 +591,7 @@ class Peptide:
         """Get ion ladder for specified ion type or all ions
 
         Args:
-            ion_type: Optional ion type ('b' or 'y'). If None, returns all ions.
+            ion_type: Optional ion type ("b" or "y"). If None, returns all ions.
 
         Returns:
             Dict[str, float]: Ion ladder dictionary mapping ion string to m/z
