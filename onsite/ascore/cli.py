@@ -284,7 +284,7 @@ def ascore(
             logger.info("Processing completed successfully")
             logger.info(f"Final statistics: {stats}")
             logger.info(f"Total time: {elapsed:.2f} seconds")
-            logger.info(f"Processing speed: {stats["processed"]/elapsed:.2f} IDs/second")
+            logger.info(f"Processing speed: {stats['processed']/elapsed:.2f} IDs/second")
 
         # Save results
         click.echo(f"[{time.strftime('%H:%M:%S')}] Saving results to {out_file}")
