@@ -87,60 +87,51 @@ onsite lucxor -in spectra.mzML -id identifications.idXML -out results.idXML
 
 #### Individual Pipeline Tools
 
-##### PhosphoScoring Pipeline (AScore)
+##### AScore Pipeline
 
-Process MS/MS data files using the AScore-based PhosphoScoring pipeline:
-
-```bash
-# Using Poetry
-poetry run phospho-scoring -in spectra.mzML -id identifications.idXML -out results.idXML
-
-# Or after installation
-phospho-scoring -in spectra.mzML -id identifications.idXML -out results.idXML
-
-# With custom parameters
-phospho-scoring -in spectra.mzML -id identifications.idXML -out results.idXML \
-    -fragment_mass_tolerance 0.05 \
-    -fragment_mass_unit Da \
-    -threads 4 \
-    --add_decoys
-```
-
-##### PhosphoRS Scoring Pipeline
-
-Use the dedicated PhosphoRS scoring pipeline:
+Process MS/MS data files using the AScore algorithm:
 
 ```bash
-# Using Poetry
-poetry run phosphors-scoring -in spectra.mzML -id identifications.idXML -out results.idXML
-
-# Or after installation
-phosphors-scoring -in spectra.mzML -id identifications.idXML -out results.idXML
+# Direct execution
+python -m onsite.ascore.cli -in spectra.mzML -id identifications.idXML -out results.idXML
 
 # With custom parameters
-phosphors-scoring -in spectra.mzML -id identifications.idXML -out results.idXML \
-    -fragment_mass_tolerance 0.05 \
-    -fragment_mass_unit Da \
-    -threads 1 \
-    --add_decoys
+python -m onsite.ascore.cli -in spectra.mzML -id identifications.idXML -out results.idXML \
+    --fragment-mass-tolerance 0.05 \
+    --fragment-mass-unit Da \
+    --threads 4 \
+    --add-decoys
 ```
 
-##### LucXor Tool
+##### PhosphoRS Pipeline
+
+Use the PhosphoRS algorithm for phosphorylation site localization:
+
+```bash
+# Direct execution
+python -m onsite.phosphors.cli -in spectra.mzML -id identifications.idXML -out results.idXML
+
+# With custom parameters
+python -m onsite.phosphors.cli -in spectra.mzML -id identifications.idXML -out results.idXML \
+    --fragment-mass-tolerance 0.05 \
+    --fragment-mass-unit Da \
+    --threads 1 \
+    --add-decoys
+```
+
+##### LucXor Pipeline
 
 Use the LucXor tool for advanced PTM localization with FLR estimation:
 
 ```bash
-# Using Poetry
-poetry run lucxor -in spectra.mzML -id identifications.idXML -out results.idXML
-
-# Or after installation
-lucxor -in spectra.mzML -id identifications.idXML -out results.idXML
+# Direct execution
+python -m onsite.lucxor.cli -in spectra.mzML -id identifications.idXML -out results.idXML
 
 # With custom parameters
-lucxor -in spectra.mzML -id identifications.idXML -out results.idXML \
-    --fragment_method HCD \
-    --fragment_mass_tolerance 0.5 \
-    --fragment_error_units Da \
+python -m onsite.lucxor.cli -in spectra.mzML -id identifications.idXML -out results.idXML \
+    --fragment-method HCD \
+    --fragment-mass-tolerance 0.5 \
+    --fragment-error-units Da \
     --threads 8 \
     --debug
 ```
@@ -221,10 +212,11 @@ results = processor.process_all_psms(psm_list, spectrum_map)
 #### Pipeline Integration
 
 ```python
-from onsite.phospho_scoring import main as phospho_scoring_main
-from onsite.phosphors.phosphors_scoring import main as phosphors_scoring_main
+from onsite.ascore.cli import main as ascore_main
+from onsite.phosphors.cli import main as phosphors_main
+from onsite.lucxor.cli import main as lucxor_main
 
-# Run PhosphoScoring pipeline programmatically
+# Run pipeline tools programmatically
 # Note: These functions expect command line arguments
 # For programmatic use, consider using the individual algorithm classes directly
 ```
@@ -328,9 +320,9 @@ The PhosphoRS algorithm implements a comprehensive approach to phosphorylation s
 
 ### Pipeline Tools
 
-#### PhosphoScoring Pipeline (AScore-based)
+#### AScore Pipeline
 
-The `phospho-scoring` tool provides a complete workflow for AScore-based phosphorylation site localization:
+The AScore CLI tool provides a complete workflow for AScore-based phosphorylation site localization:
 
 **Features:**
 - Multi-threaded processing (default: 4 threads)
@@ -344,9 +336,9 @@ The `phospho-scoring` tool provides a complete workflow for AScore-based phospho
 - Site-specific localization scores
 - Confidence metrics and statistics
 
-#### PhosphoRS Scoring Pipeline
+#### PhosphoRS Pipeline
 
-The `phosphors-scoring` tool provides a dedicated pipeline for PhosphoRS-based localization:
+The PhosphoRS CLI tool provides a dedicated pipeline for PhosphoRS-based localization:
 
 **Features:**
 - Sequential processing (default: 1 thread for stability)
@@ -393,12 +385,12 @@ onsite/
 │   ├── __init__.py           # Package initialization and exports
 │   ├── ascore/               # AScore algorithm package
 │   │   ├── __init__.py       # AScore package initialization
-│   │   └── ascore.py         # AScore algorithm implementation
+│   │   ├── ascore.py         # AScore algorithm implementation
+│   │   └── cli.py            # AScore command-line interface
 │   ├── phosphors/             # PhosphoRS algorithm package
 │   │   ├── __init__.py       # PhosphoRS package initialization
 │   │   ├── phosphors.py      # PhosphoRS algorithm implementation
-│   │   └── phosphors_scoring.py  # PhosphoRS-based scoring pipeline
-│   ├── phospho_scoring.py    # AScore-based scoring pipeline
+│   │   └── cli.py            # PhosphoRS command-line interface
 │   ├── onsitec.py            # Unified command-line interface
 │   └── lucxor/               # LucXor (LuciPHOr2) implementation
 │       ├── __init__.py       # LucXor package initialization

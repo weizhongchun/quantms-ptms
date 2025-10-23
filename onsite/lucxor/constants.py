@@ -47,46 +47,61 @@ FUNCTION_TIME_LIMIT = 120  # seconds
 
 # Amino acid masses (monoisotopic)
 AA_MASSES = {
-    'A': 71.03711, 'C': 103.00919, 'D': 115.02694,
-    'E': 129.04259, 'F': 147.06841, 'G': 57.02146,
-    'H': 137.05891, 'I': 113.08406, 'K': 128.09496,
-    'L': 113.08406, 'M': 131.04049, 'N': 114.04293,
-    'P': 97.05276, 'Q': 128.05858, 'R': 156.10111,
-    'S': 87.03203, 'T': 101.04768, 'V': 99.06841,
-    'W': 186.07931, 'Y': 163.06333
+    "A": 71.03711,
+    "C": 103.00919,
+    "D": 115.02694,
+    "E": 129.04259,
+    "F": 147.06841,
+    "G": 57.02146,
+    "H": 137.05891,
+    "I": 113.08406,
+    "K": 128.09496,
+    "L": 113.08406,
+    "M": 131.04049,
+    "N": 114.04293,
+    "P": 97.05276,
+    "Q": 128.05858,
+    "R": 156.10111,
+    "S": 87.03203,
+    "T": 101.04768,
+    "V": 99.06841,
+    "W": 186.07931,
+    "Y": 163.06333,
 }
 
 # Add lowercase letter mass definitions for modification sites (including modification mass)
-AA_MASSES.update({
-    's': 87.03203 + 79.966331,  # Ser + phosphorylation
-    't': 101.04768 + 79.966331,  # Thr + phosphorylation
-    'y': 163.06333 + 79.966331,  # Tyr + phosphorylation
-    'a': 71.03711 + 79.966331,  # Ala + PhosphoDecoy
-    'm': 131.04049 + 15.994915,  # Met + oxidation
-})
+AA_MASSES.update(
+    {
+        "s": 87.03203 + 79.966331,  # Ser + phosphorylation
+        "t": 101.04768 + 79.966331,  # Thr + phosphorylation
+        "y": 163.06333 + 79.966331,  # Tyr + phosphorylation
+        "a": 71.03711 + 79.966331,  # Ala + PhosphoDecoy
+        "m": 131.04049 + 15.994915,  # Met + oxidation
+    }
+)
 
 # Decoy amino acid mapping
 DECOY_AA_MAP = {
-    '2': 'A',
-    '3': 'R',
-    '4': 'N',
-    '5': 'D',
-    '6': 'C',
-    '7': 'E',
-    '8': 'Q',
-    '9': 'G',
-    '0': 'H',
-    '@': 'I',
-    '#': 'L',
-    '$': 'K',
-    '%': 'M',
-    '&': 'F',
-    ';': 'P',
-    '?': 'W',
-    '~': 'V',
-    '^': 'S',
-    '*': 'T',
-    '=': 'Y'
+    "2": "A",
+    "3": "R",
+    "4": "N",
+    "5": "D",
+    "6": "C",
+    "7": "E",
+    "8": "Q",
+    "9": "G",
+    "0": "H",
+    "@": "I",
+    "#": "L",
+    "$": "K",
+    "%": "M",
+    "&": "F",
+    ";": "P",
+    "?": "W",
+    "~": "V",
+    "^": "S",
+    "*": "T",
+    "=": "Y",
 }
 
 # Reverse mapping for decoy amino acids
@@ -106,79 +121,69 @@ DEFAULT_CONFIG = {
     "fragment_mass_tolerance": 0.5,
     "fragment_error_units": "Da",
     "min_mz": 150.0,
-    
     # Modification settings
-    "target_modifications": [
-        "Phospho (S)",
-        "Phospho (T)",
-        "Phospho (Y)"
-    ],
+    "target_modifications": ["Phospho (S)", "Phospho (T)", "Phospho (Y)"],
     "neutral_losses": [
         "sty -H3PO4 -97.97690"  # Amino acid list, neutral loss name, mass
     ],
-    "decoy_neutral_losses": [
-        "X -H3PO4 -97.97690"  # Neutral loss for decoy sequences
-    ],
+    "decoy_neutral_losses": ["X -H3PO4 -97.97690"],  # Neutral loss for decoy sequences
     "decoy_mass": 79.966331,
-    
     # Peptide settings
     "max_charge_state": 5,
     "max_peptide_length": 40,
     "max_num_perm": 16384,
-    
     # Scoring settings
     "modeling_score_threshold": 0.95,
     "scoring_threshold": 0.0,
     "min_num_psms_model": 50,
-    
     # Performance settings
     "num_threads": 6,
-    "rt_tolerance": 0.01
+    "rt_tolerance": 0.01,
 }
 
 # Ion types
 ION_TYPES = {
-    'b': 1.007825,  # H
-    'y': 19.01839,   # H2O + H
-    'a': -26.98772,  # CO
-    'c': 17.02655,   # NH3
-    'x': 25.97913,   # CO2
-    'z': 1.99184     # NH2
+    "b": 1.007825,  # H
+    "y": 19.01839,  # H2O + H
+    "a": -26.98772,  # CO
+    "c": 17.02655,  # NH3
+    "x": 25.97913,  # CO2
+    "z": 1.99184,  # NH2
 }
 
 # Neutral losses
 NEUTRAL_LOSSES = {
-    'H3PO4': 97.976896,  # Phosphoric acid
-    'H2O': 18.010565,    # Water
-    'NH3': 17.026549,    # Ammonia
-    'CO': 27.994915,     # Carbon monoxide
-    'CO2': 43.989829,    # Carbon dioxide
-    'sty': -97.97690,    # H3PO4
-    'S': 98.00039,  # Ser phosphorylation neutral loss
-    'T': 98.00039,  # Thr phosphorylation neutral loss
-    'Y': 98.00039   # Tyr phosphorylation neutral loss
+    "H3PO4": 97.976896,  # Phosphoric acid
+    "H2O": 18.010565,  # Water
+    "NH3": 17.026549,  # Ammonia
+    "CO": 27.994915,  # Carbon monoxide
+    "CO2": 43.989829,  # Carbon dioxide
+    "sty": -97.97690,  # H3PO4
+    "S": 98.00039,  # Ser phosphorylation neutral loss
+    "T": 98.00039,  # Thr phosphorylation neutral loss
+    "Y": 98.00039,  # Tyr phosphorylation neutral loss
 }
 
 # Score types
 SCORE_TYPES = {
-    'Posterior Error Probability': 0,
-    'Mascot Ion Score': 1,
-    '-log(E-value)': 2,
-    'X!Tandem Hyperscore': 3,
-    'Sequest Xcorr': 4
+    "Posterior Error Probability": 0,
+    "Mascot Ion Score": 1,
+    "-log(E-value)": 2,
+    "X!Tandem Hyperscore": 3,
+    "Sequest Xcorr": 4,
 }
 
 # Modification masses
 MOD_MASSES = {
-    'Phospho': 79.966331,
-    'Oxidation': 15.994915,
+    "Phospho": 79.966331,
+    "Oxidation": 15.994915,
 }
 
 # Decoy amino acid mapping
 DECOY_AMINO_ACIDS = {
-    'S': 'A',  # Ser -> Ala
-    'T': 'V',  # Thr -> Val
-    'Y': 'F'   # Tyr -> Phe
+    "S": "A",  # Ser -> Ala
+    "T": "V",  # Thr -> Val
+    "Y": "F",  # Tyr -> Phe
 }
 
 # New constants
