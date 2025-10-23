@@ -149,7 +149,7 @@ def phosphors(
                     traceback.print_exc()
         else:
             workers = max(1, int(threads))
-            print(
+            click.echo(
                 f"[{time.strftime('%H:%M:%S')}] Parallel execution with {workers} processes"
             )
             if debug:
