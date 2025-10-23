@@ -58,7 +58,7 @@ from .phosphors import calculate_phospho_localization_compomics_style
     "threads",
     type=int,
     default=1,
-    help="Number of parallel threads (default: 1)",
+    help="Number of parallel processes (default: 1)",
 )
 @click.option(
     "--debug", "debug", is_flag=True, help="Enable debug output and write debug log"
