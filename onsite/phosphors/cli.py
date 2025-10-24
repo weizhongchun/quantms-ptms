@@ -343,27 +343,29 @@ def save_identifications(out_file, protein_ids, peptide_ids):
 def find_spectrum_by_mz(exp, target_mz, rt=None, ppm_tolerance=10):
     """Optimized spectrum matching with caching"""
     # Binary search for optimized spectrum matching
-    if not hasattr(find_spectrum_by_mz, "spectrum_cache"):
-        find_spectrum_by_mz.spectrum_cache = {}
-        find_spectrum_by_mz.spectrum_list = []
-
+    cache = getattr(find_spectrum_by_mz, "spectrum_cache", {})
+    exp_key = id(exp)
+    if exp_key not in cache:
+        cache[exp_key] = {"spectra": []}
+        find_spectrum_by_mz.spectrum_cache = cache
         # Preprocess all MS2 spectra
         for spec in exp:
             if spec.getMSLevel() == 2 and spec.getPrecursors():
                 mz = spec.getPrecursors()[0].getMZ()
-                find_spectrum_by_mz.spectrum_list.append((mz, spec))
+                cache[exp_key]["spectra"].append((mz, spec))
 
         # Sort by m/z
-        find_spectrum_by_mz.spectrum_list.sort(key=lambda x: x[0])
+        cache[exp_key]["spectra"].sort(key=lambda x: x[0])
 
     # Binary search for the closest m/z
-    left, right = 0, len(find_spectrum_by_mz.spectrum_list) - 1
+    spectra = cache[exp_key]["spectra"]
+    left, right = 0, len(spectra) - 1
     best_match = None
     min_diff = float("inf")
 
     while left <= right:
         mid = (left + right) // 2
-        mz, spec = find_spectrum_by_mz.spectrum_list[mid]
+        mz, spec = spectra[mid]
         diff = abs(mz - target_mz)
 
         if diff < min_diff:
@@ -375,6 +377,16 @@ def find_spectrum_by_mz(exp, target_mz, rt=None, ppm_tolerance=10):
         else:
             right = mid - 1
 
+    if best_match is None:
+        return None
+    # Enforce ppm tolerance and optional RT tolerance (~0.1 s default behavior)
+    best_mz = best_match.getPrecursors()[0].getMZ()
+    ppm = abs(best_mz - target_mz) / max(target_mz, 1e-12) * 1e6
+    if ppm > ppm_tolerance:
+        return None
+    if rt is not None:
+        if abs(best_match.getRT() - rt) > 0.1:
+            return None
     return best_match
 
 
