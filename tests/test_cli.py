@@ -106,7 +106,7 @@ def test_cli_lucxor_missing_required_args():
     assert "Missing option" in result.output
 
 
-@patch("onsite.ascore.cli.ascore")
+@patch("onsite.onsitec.ascore")
 def test_cli_ascore_execution(mock_ascore):
     """Test AScore execution through CLI."""
     runner = CliRunner()
@@ -134,7 +134,8 @@ def test_cli_ascore_execution(mock_ascore):
 
         # Should not exit with error (though ascore is mocked)
         # The command may fail due to file validation, but the CLI should handle it gracefully
-        assert result.exit_code in [0, 1]  # Either success or expected failure
+        assert result.exit_code == 0, f"CLI failed: {result.output}"  # Either success or expected failure
+        mock_ascore.assert_called_once()
 
 
 @patch("onsite.phosphors.cli.phosphors")
@@ -202,3 +203,4 @@ def test_cli_unknown_command():
 
     assert result.exit_code != 0
     assert "No such command" in result.output
+
