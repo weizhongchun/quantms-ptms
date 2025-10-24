@@ -665,14 +665,6 @@ class PyLuciPHOr2:
 
         return 0
 
-
-
-def main():
-    """Entry point for standalone LucXor CLI."""
-    lucxor()
-
-
-
 def main():
     """Entry point for standalone LucXor CLI."""
     lucxor()
@@ -680,3 +672,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
