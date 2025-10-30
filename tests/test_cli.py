@@ -106,7 +106,7 @@ def test_cli_lucxor_missing_required_args():
     assert "Missing option" in result.output
 
 
-@patch("onsite.onsitec.ascore")
+@patch("onsite.ascore.cli.ascore")
 def test_cli_ascore_execution(mock_ascore):
     """Test AScore execution through CLI."""
     runner = CliRunner()
@@ -138,7 +138,7 @@ def test_cli_ascore_execution(mock_ascore):
         mock_ascore.assert_called_once()
 
 
-@patch("onsite.onsitec.phosphors")
+@patch("onsite.phosphors.cli.phosphors")
 def test_cli_phosphors_execution(mock_phosphors):
     """Test PhosphoRS execution through CLI."""
     runner = CliRunner()
@@ -168,7 +168,7 @@ def test_cli_phosphors_execution(mock_phosphors):
         mock_phosphors.assert_called_once()
 
 
-@patch("onsite.onsitec.lucxor")
+@patch("onsite.lucxor.cli.lucxor")
 def test_cli_lucxor_execution(mock_lucxor):
     """Test LucXor execution through CLI."""
     runner = CliRunner()
@@ -204,6 +204,7 @@ def test_cli_unknown_command():
 
     assert result.exit_code != 0
     assert "No such command" in result.output
+
 
 
 
