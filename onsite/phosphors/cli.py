@@ -268,7 +268,7 @@ def phosphors(
             logger.info(f"Total time: {elapsed:.2f} seconds")
 
         # Save results
-        click.echo(f"[{time.strftime("%H:%M:%S")}] Saving results to {out_file}")
+        click.echo(f"[{time.strftime('%H:%M:%S')}] Saving results to {out_file}")
         save_identifications(out_file, protein_ids, processed_peptide_ids)
 
     except KeyboardInterrupt:
