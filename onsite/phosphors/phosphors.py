@@ -45,7 +45,7 @@ DEFAULT_OCCURRENCE_PROBABILITY = (
 
 # --- Distribution Cache ---
 DISTRIBUTION_CACHE_SIZE = 1000
-_distribution_cache = {}  # p -> {n -> BinomialDistribution}
+_distribution_cache = None  # p -> {n -> BinomialDistribution}
 
 
 # --- Utility helpers ---
