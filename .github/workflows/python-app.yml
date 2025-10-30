@@ -1,0 +1,209 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Python application
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.11"
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest pytest-cov click
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        # Install the package in development mode
+        pip install -e .
+    
+    - name: Install 7-Zip
+      run: sudo apt-get update && sudo apt-get install -y p7zip-full
+
+    - name: Extract test data files
+      run: |
+        # Extract compressed mzML file from zip archives
+        cd data
+        if [ -f 1.zip ]; then
+          echo "Extracting 1.mzML from split zip archives..."
+          ls -lh 1.*
+          7z x 1.zip
+          ls -lh 1.mzML
+          echo "Extraction complete"
+        else
+          echo "Warning: 1.zip not found in data directory"
+          ls -la
+        fi
+        cd ..
+    
+    - name: Verify test data files
+      run: |
+        # Verify that required test data files exist
+        if [ ! -f data/1_consensus_fdr_filter_pep.idXML ]; then
+          echo "Error: idXML file not found"
+          exit 1
+        fi
+        if [ ! -f data/1.mzML ]; then
+          echo "Error: mzML file not found"
+          exit 1
+        fi
+        echo "Test data files verified:"
+        ls -lh data/1_consensus_fdr_filter_pep.idXML
+        ls -lh data/1.mzML
+    
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 onsite/ --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=__pycache__,.git,build,dist
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 onsite/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=__pycache__,.git,build,dist
+    
+    - name: Test package imports
+      run: |
+        # Test that the package and all modules can be imported
+        python -c "import onsite; print('onsite package imported successfully')"
+        python -c "from onsite import AScore; print('AScore imported successfully')"
+        python -c "from onsite import calculate_phospho_localization_compomics_style; print('PhosphoRS imported successfully')"
+        python -c "from onsite.lucxor import cli; print('LucXor CLI imported successfully')"
+    
+    - name: Test CLI commands availability
+      run: |
+        # Test that CLI commands are available
+        onsite --help
+        ascore --help || python -m onsite.ascore.cli --help
+        phosphors --help || python -m onsite.phosphors.cli --help
+        lucxor --help || python -m onsite.lucxor.cli --help
+    
+    - name: Run unit tests
+      run: |
+        # Run all unit tests with pytest
+        pytest tests/ -v --tb=short --color=yes
+    
+    - name: Test AScore with real data
+      run: |
+        # Test AScore algorithm with real data
+        python -m onsite.ascore.cli \
+          -in data/1.mzML \
+          -id data/1_consensus_fdr_filter_pep.idXML \
+          -out test_ascore_output.idXML \
+          --fragment-mass-tolerance 0.05 \
+          --fragment-mass-unit Da \
+          --threads 4 \
+          --add-decoys
+        
+        # Verify output file was created
+        if [ -f test_ascore_output.idXML ]; then
+          echo "AScore output file created successfully"
+          ls -lh test_ascore_output.idXML
+        else
+          echo "Warning: AScore output file not created (may be expected if no phosphorylated peptides)"
+        fi
+    
+    - name: Test PhosphoRS with real data
+      run: |
+        # Test PhosphoRS algorithm with real data
+        python -m onsite.phosphors.cli \
+          -in data/1.mzML \
+          -id data/1_consensus_fdr_filter_pep.idXML \
+          -out test_phosphors_output.idXML \
+          --fragment-mass-tolerance 0.05 \
+          --fragment-mass-unit Da \
+          --threads 4 \
+          --add-decoys
+        
+        # Verify output file was created
+        if [ -f test_phosphors_output.idXML ]; then
+          echo "PhosphoRS output file created successfully"
+          ls -lh test_phosphors_output.idXML
+        else
+          echo "Warning: PhosphoRS output file not created (may be expected if no phosphorylated peptides)"
+        fi
+    
+    - name: Test LucXor with real data
+      run: |
+        # Test LucXor algorithm with real data
+        python -m onsite.lucxor.cli \
+          -in data/1.mzML \
+          -id data/1_consensus_fdr_filter_pep.idXML \
+          -out test_lucxor_output.idXML \
+          --fragment-method HCD \
+          --fragment-mass-tolerance 0.5 \
+          --fragment-error-units Da \
+          --threads 4 \
+          --min-num-psms-model 50
+        
+        # Verify output file was created
+        if [ -f test_lucxor_output.idXML ]; then
+          echo "LucXor output file created successfully"
+          ls -lh test_lucxor_output.idXML
+        else
+          echo "Warning: LucXor output file not created (may be expected if no phosphorylated peptides)"
+        fi
+    
+    - name: Test unified CLI with real data
+      run: |
+        # Test unified onsite CLI command
+        onsite ascore \
+          -in data/1.mzML \
+          -id data/1_consensus_fdr_filter_pep.idXML \
+          -out test_unified_ascore.idXML \
+          --fragment-mass-tolerance 0.05 \
+          --fragment-mass-unit Da \
+          --threads 4 \
+          --add-decoys
+        
+        onsite phosphors \
+          -in data/1.mzML \
+          -id data/1_consensus_fdr_filter_pep.idXML \
+          -out test_unified_phosphors.idXML \
+          --fragment-mass-tolerance 0.05 \
+          --fragment-mass-unit Da \
+          --threads 4 \
+          --add-decoys
+        
+        onsite lucxor \
+          -in data/1.mzML \
+          -id data/1_consensus_fdr_filter_pep.idXML \
+          -out test_unified_lucxor.idXML \
+          --fragment-method HCD \
+          --fragment-mass-tolerance 0.5 \
+          --threads 4 \
+          --min-num-psms-model 50
+    
+    - name: Upload test outputs as artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-outputs
+        path: |
+          test_*.idXML
+        retention-days: 7
+    
+    - name: Generate test coverage report
+      run: |
+        # Run tests with coverage
+        pytest tests/ --cov=onsite --cov-report=xml --cov-report=term
+    
+    - name: Upload coverage to artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coverage.xml
+        retention-days: 7
+
