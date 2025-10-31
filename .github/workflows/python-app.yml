@@ -103,7 +103,6 @@ jobs:
           -out test_ascore_output.idXML \
           --fragment-mass-tolerance 0.05 \
           --fragment-mass-unit Da \
-          --threads 4 \
           --add-decoys
         
         # Verify output file was created
@@ -123,7 +122,6 @@ jobs:
           -out test_phosphors_output.idXML \
           --fragment-mass-tolerance 0.05 \
           --fragment-mass-unit Da \
-          --threads 4 \
           --add-decoys
         
         # Verify output file was created
@@ -144,7 +142,6 @@ jobs:
           --fragment-method HCD \
           --fragment-mass-tolerance 0.5 \
           --fragment-error-units Da \
-          --threads 4 \
           --min-num-psms-model 50
         
         # Verify output file was created
@@ -164,7 +161,6 @@ jobs:
           -out test_unified_ascore.idXML \
           --fragment-mass-tolerance 0.05 \
           --fragment-mass-unit Da \
-          --threads 4 \
           --add-decoys
         
         onsite phosphors \
@@ -173,7 +169,6 @@ jobs:
           -out test_unified_phosphors.idXML \
           --fragment-mass-tolerance 0.05 \
           --fragment-mass-unit Da \
-          --threads 4 \
           --add-decoys
         
         onsite lucxor \
@@ -182,7 +177,6 @@ jobs:
           -out test_unified_lucxor.idXML \
           --fragment-method HCD \
           --fragment-mass-tolerance 0.5 \
-          --threads 4 \
           --min-num-psms-model 50
     
     - name: Upload test outputs as artifacts
