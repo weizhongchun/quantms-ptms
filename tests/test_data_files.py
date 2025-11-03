@@ -223,230 +223,229 @@ class TestAlgorithmExecution:
         except Exception as e:
             pytest.fail(f"PhosphoRS test failed: {e}")
 
-#Test timeout, temporarily commented out.
-# class TestCLIWithRealData:
-#     """Test CLI execution with real data files."""
+class TestCLIWithRealData:
+    """Test CLI execution with real data files."""
     
-#     @pytest.fixture
-#     def data_dir(self):
-#         """Get the data directory path."""
-#         return Path(__file__).parent.parent / "data"
+    @pytest.fixture
+    def data_dir(self):
+        """Get the data directory path."""
+        return Path(__file__).parent.parent / "data"
     
-#     @pytest.fixture
-#     def idxml_file(self, data_dir):
-#         """Get the idXML file path."""
-#         return data_dir / "1_consensus_fdr_filter_pep.idXML"
+    @pytest.fixture
+    def idxml_file(self, data_dir):
+        """Get the idXML file path."""
+        return data_dir / "1_consensus_fdr_filter_pep.idXML"
     
-#     @pytest.fixture
-#     def mzml_file(self, data_dir):
-#         """Get the mzML file path."""
-#         return data_dir / "1.mzML"
+    @pytest.fixture
+    def mzml_file(self, data_dir):
+        """Get the mzML file path."""
+        return data_dir / "1.mzML"
     
-#     def test_ascore_cli_with_real_data(self, idxml_file, mzml_file):
-#         """Test AScore CLI with real data files."""
-#         runner = CliRunner()
+    def test_ascore_cli_with_real_data(self, idxml_file, mzml_file):
+        """Test AScore CLI with real data files."""
+        runner = CliRunner()
         
-#         with tempfile.TemporaryDirectory() as temp_dir:
-#             output_file = os.path.join(temp_dir, "ascore_result.idXML")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_file = os.path.join(temp_dir, "ascore_result.idXML")
             
-#             result = runner.invoke(
-#                 cli,
-#                 [
-#                     "ascore",
-#                     "--in-file", str(mzml_file),
-#                     "--id-file", str(idxml_file),
-#                     "--out-file", output_file,
-#                 ],
-#             )
+            result = runner.invoke(
+                cli,
+                [
+                    "ascore",
+                    "--in-file", str(mzml_file),
+                    "--id-file", str(idxml_file),
+                    "--out-file", output_file,
+                ],
+            )
             
-#             # Check that command executed (may fail due to algorithm requirements)
-#             assert result.exit_code in [0, 1], f"AScore CLI should execute: {result.output}"
+            # Check that command executed (may fail due to algorithm requirements)
+            assert result.exit_code in [0, 1], f"AScore CLI should execute: {result.output}"
             
-#             # If successful, check output file
-#             if result.exit_code == 0:
-#                 assert os.path.exists(output_file), "Output file should be created"
-#                 assert os.path.getsize(output_file) > 0, "Output file should not be empty"
+            # If successful, check output file
+            if result.exit_code == 0:
+                assert os.path.exists(output_file), "Output file should be created"
+                assert os.path.getsize(output_file) > 0, "Output file should not be empty"
     
-#     def test_phosphors_cli_with_real_data(self, idxml_file, mzml_file):
-#         """Test PhosphoRS CLI with real data files."""
-#         runner = CliRunner()
+    def test_phosphors_cli_with_real_data(self, idxml_file, mzml_file):
+        """Test PhosphoRS CLI with real data files."""
+        runner = CliRunner()
         
-#         with tempfile.TemporaryDirectory() as temp_dir:
-#             output_file = os.path.join(temp_dir, "phosphors_result.idXML")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_file = os.path.join(temp_dir, "phosphors_result.idXML")
             
-#             result = runner.invoke(
-#                 cli,
-#                 [
-#                     "phosphors",
-#                     "--in-file", str(mzml_file),
-#                     "--id-file", str(idxml_file),
-#                     "--out-file", output_file,
-#                 ],
-#             )
+            result = runner.invoke(
+                cli,
+                [
+                    "phosphors",
+                    "--in-file", str(mzml_file),
+                    "--id-file", str(idxml_file),
+                    "--out-file", output_file,
+                ],
+            )
             
-#             # Check that command executed (may fail due to algorithm requirements)
-#             assert result.exit_code in [0, 1], f"PhosphoRS CLI should execute: {result.output}"
+            # Check that command executed (may fail due to algorithm requirements)
+            assert result.exit_code in [0, 1], f"PhosphoRS CLI should execute: {result.output}"
             
-#             # If successful, check output file
-#             if result.exit_code == 0:
-#                 assert os.path.exists(output_file), "Output file should be created"
-#                 assert os.path.getsize(output_file) > 0, "Output file should not be empty"
+            # If successful, check output file
+            if result.exit_code == 0:
+                assert os.path.exists(output_file), "Output file should be created"
+                assert os.path.getsize(output_file) > 0, "Output file should not be empty"
     
-#     def test_lucxor_cli_with_real_data(self, idxml_file, mzml_file):
-#         """Test LucXor CLI with real data files."""
-#         runner = CliRunner()
+    def test_lucxor_cli_with_real_data(self, idxml_file, mzml_file):
+        """Test LucXor CLI with real data files."""
+        runner = CliRunner()
         
-#         with tempfile.TemporaryDirectory() as temp_dir:
-#             output_file = os.path.join(temp_dir, "lucxor_result.idXML")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_file = os.path.join(temp_dir, "lucxor_result.idXML")
             
-#             result = runner.invoke(
-#                 cli,
-#                 [
-#                     "lucxor",
-#                     "--input-spectrum", str(mzml_file),
-#                     "--input-id", str(idxml_file),
-#                     "--output", output_file,
-#                 ],
-#             )
+            result = runner.invoke(
+                cli,
+                [
+                    "lucxor",
+                    "--input-spectrum", str(mzml_file),
+                    "--input-id", str(idxml_file),
+                    "--output", output_file,
+                ],
+            )
             
-#             # Check that command executed (may fail due to algorithm requirements)
-#             assert result.exit_code in [0, 1], f"LucXor CLI should execute: {result.output}"
+            # Check that command executed (may fail due to algorithm requirements)
+            assert result.exit_code in [0, 1], f"LucXor CLI should execute: {result.output}"
             
-#             # If successful, check output file
-#             if result.exit_code == 0:
-#                 assert os.path.exists(output_file), "Output file should be created"
-#                 assert os.path.getsize(output_file) > 0, "Output file should not be empty"
+            # If successful, check output file
+            if result.exit_code == 0:
+                assert os.path.exists(output_file), "Output file should be created"
+                assert os.path.getsize(output_file) > 0, "Output file should not be empty"
 
 
-# class TestLucXorWithRealData:
-#     """Test LucXor algorithm with real data files."""
+class TestLucXorWithRealData:
+    """Test LucXor algorithm with real data files."""
     
-#     @pytest.fixture
-#     def data_dir(self):
-#         """Get the data directory path."""
-#         return Path(__file__).parent.parent / "data"
+    @pytest.fixture
+    def data_dir(self):
+        """Get the data directory path."""
+        return Path(__file__).parent.parent / "data"
     
-#     @pytest.fixture
-#     def idxml_file(self, data_dir):
-#         """Get the idXML file path."""
-#         return data_dir / "1_consensus_fdr_filter_pep.idXML"
+    @pytest.fixture
+    def idxml_file(self, data_dir):
+        """Get the idXML file path."""
+        return data_dir / "1_consensus_fdr_filter_pep.idXML"
     
-#     @pytest.fixture
-#     def mzml_file(self, data_dir):
-#         """Get the mzML file path."""
-#         return data_dir / "1.mzML"
+    @pytest.fixture
+    def mzml_file(self, data_dir):
+        """Get the mzML file path."""
+        return data_dir / "1.mzML"
     
-#     def test_lucxor_import(self):
-#         """Test that LucXor module can be imported."""
-#         try:
-#             from onsite import lucxor
-#             assert lucxor is not None, "LucXor module should be importable"
-#         except ImportError as e:
-#             pytest.skip(f"LucXor not available: {e}")
+    def test_lucxor_import(self):
+        """Test that LucXor module can be imported."""
+        try:
+            from onsite import lucxor
+            assert lucxor is not None, "LucXor module should be importable"
+        except ImportError as e:
+            pytest.skip(f"LucXor not available: {e}")
     
-#     def test_lucxor_cli_with_real_data(self, idxml_file, mzml_file):
-#         """Test LucXor CLI with real data files."""
-#         runner = CliRunner()
+    def test_lucxor_cli_with_real_data(self, idxml_file, mzml_file):
+        """Test LucXor CLI with real data files."""
+        runner = CliRunner()
         
-#         with tempfile.TemporaryDirectory() as temp_dir:
-#             output_file = os.path.join(temp_dir, "lucxor_result.idXML")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_file = os.path.join(temp_dir, "lucxor_result.idXML")
             
-#             result = runner.invoke(
-#                 cli,
-#                 [
-#                     "lucxor",
-#                     "--input-spectrum", str(mzml_file),
-#                     "--input-id", str(idxml_file),
-#                     "--output", output_file,
-#                 ],
-#             )
+            result = runner.invoke(
+                cli,
+                [
+                    "lucxor",
+                    "--input-spectrum", str(mzml_file),
+                    "--input-id", str(idxml_file),
+                    "--output", output_file,
+                ],
+            )
             
-#             # Check that command executed (may fail due to algorithm requirements)
-#             assert result.exit_code in [0, 1], f"LucXor CLI should execute: {result.output}"
+            # Check that command executed (may fail due to algorithm requirements)
+            assert result.exit_code in [0, 1], f"LucXor CLI should execute: {result.output}"
             
-#             # If successful, check output file
-#             if result.exit_code == 0:
-#                 assert os.path.exists(output_file), "Output file should be created"
-#                 assert os.path.getsize(output_file) > 0, "Output file should not be empty"
+            # If successful, check output file
+            if result.exit_code == 0:
+                assert os.path.exists(output_file), "Output file should be created"
+                assert os.path.getsize(output_file) > 0, "Output file should not be empty"
     
-#     def test_lucxor_data_loading(self, idxml_file, mzml_file):
-#         """Test that LucXor can load the data files."""
-#         try:
-#             # Load data
-#             peptide_ids = []
-#             protein_ids = []
-#             IdXMLFile().load(str(idxml_file), protein_ids, peptide_ids)
+    def test_lucxor_data_loading(self, idxml_file, mzml_file):
+        """Test that LucXor can load the data files."""
+        try:
+            # Load data
+            peptide_ids = []
+            protein_ids = []
+            IdXMLFile().load(str(idxml_file), protein_ids, peptide_ids)
             
-#             exp = MSExperiment()
-#             MzMLFile().load(str(mzml_file), exp)
+            exp = MSExperiment()
+            MzMLFile().load(str(mzml_file), exp)
             
-#             assert len(peptide_ids) > 0, "Should have peptide identifications"
-#             assert len(protein_ids) > 0, "Should have protein identifications"
-#             assert exp.size() > 0, "Should have spectra"
+            assert len(peptide_ids) > 0, "Should have peptide identifications"
+            assert len(protein_ids) > 0, "Should have protein identifications"
+            assert exp.size() > 0, "Should have spectra"
             
-#             # Check that we have some peptide hits
-#             total_hits = sum(len(pep_id.getHits()) for pep_id in peptide_ids)
-#             assert total_hits > 0, "Should have peptide hits"
+            # Check that we have some peptide hits
+            total_hits = sum(len(pep_id.getHits()) for pep_id in peptide_ids)
+            assert total_hits > 0, "Should have peptide hits"
             
-#         except Exception as e:
-#             pytest.fail(f"Failed to load data for LucXor: {e}")
+        except Exception as e:
+            pytest.fail(f"Failed to load data for LucXor: {e}")
     
-#     def test_lucxor_algorithm_availability(self):
-#         """Test that LucXor algorithm components are available."""
-#         try:
-#             from onsite.lucxor import core, models, spectrum, peptide
-#             assert core is not None, "LucXor core module should be available"
-#             assert models is not None, "LucXor models module should be available"
-#             assert spectrum is not None, "LucXor spectrum module should be available"
-#             assert peptide is not None, "LucXor peptide module should be available"
-#         except ImportError as e:
-#             pytest.skip(f"LucXor modules not available: {e}")
+    def test_lucxor_algorithm_availability(self):
+        """Test that LucXor algorithm components are available."""
+        try:
+            from onsite.lucxor import core, models, spectrum, peptide
+            assert core is not None, "LucXor core module should be available"
+            assert models is not None, "LucXor models module should be available"
+            assert spectrum is not None, "LucXor spectrum module should be available"
+            assert peptide is not None, "LucXor peptide module should be available"
+        except ImportError as e:
+            pytest.skip(f"LucXor modules not available: {e}")
     
-#     def test_lucxor_config_loading(self):
-#         """Test that LucXor configuration can be loaded."""
-#         try:
-#             from onsite.lucxor import config
-#             assert config is not None, "LucXor config module should be available"
-#         except ImportError as e:
-#             pytest.skip(f"LucXor config not available: {e}")
+    def test_lucxor_config_loading(self):
+        """Test that LucXor configuration can be loaded."""
+        try:
+            from onsite.lucxor import config
+            assert config is not None, "LucXor config module should be available"
+        except ImportError as e:
+            pytest.skip(f"LucXor config not available: {e}")
     
-#     def test_lucxor_constants_loading(self):
-#         """Test that LucXor constants can be loaded."""
-#         try:
-#             from onsite.lucxor import constants
-#             assert constants is not None, "LucXor constants module should be available"
-#         except ImportError as e:
-#             pytest.skip(f"LucXor constants not available: {e}")
+    def test_lucxor_constants_loading(self):
+        """Test that LucXor constants can be loaded."""
+        try:
+            from onsite.lucxor import constants
+            assert constants is not None, "LucXor constants module should be available"
+        except ImportError as e:
+            pytest.skip(f"LucXor constants not available: {e}")
 
 
-# class TestLucXorIntegration:
-#     """Test LucXor integration with the main package."""
+class TestLucXorIntegration:
+    """Test LucXor integration with the main package."""
     
-#     def test_lucxor_in_main_package(self):
-#         """Test that LucXor is properly integrated in the main package."""
-#         try:
-#             from onsite import lucxor
-#             assert lucxor is not None, "LucXor should be available in main package"
-#         except ImportError:
-#             pytest.skip("LucXor not available in main package")
+    def test_lucxor_in_main_package(self):
+        """Test that LucXor is properly integrated in the main package."""
+        try:
+            from onsite import lucxor
+            assert lucxor is not None, "LucXor should be available in main package"
+        except ImportError:
+            pytest.skip("LucXor not available in main package")
     
-#     def test_lucxor_cli_command(self):
-#         """Test that LucXor CLI command is available."""
-#         runner = CliRunner()
-#         result = runner.invoke(cli, ["--help"])
+    def test_lucxor_cli_command(self):
+        """Test that LucXor CLI command is available."""
+        runner = CliRunner()
+        result = runner.invoke(cli, ["--help"])
         
-#         assert result.exit_code == 0, "CLI help should work"
-#         assert "lucxor" in result.output, "LucXor command should be in help"
+        assert result.exit_code == 0, "CLI help should work"
+        assert "lucxor" in result.output, "LucXor command should be in help"
     
-#     def test_lucxor_cli_help(self):
-#         """Test LucXor CLI help command."""
-#         runner = CliRunner()
-#         result = runner.invoke(cli, ["lucxor", "--help"])
+    def test_lucxor_cli_help(self):
+        """Test LucXor CLI help command."""
+        runner = CliRunner()
+        result = runner.invoke(cli, ["lucxor", "--help"])
         
-#         assert result.exit_code == 0, "LucXor help should work"
-#         assert "input-spectrum" in result.output, "Should have input-spectrum option"
-#         assert "input-id" in result.output, "Should have input-id option"
-#         assert "output" in result.output, "Should have output option"
+        assert result.exit_code == 0, "LucXor help should work"
+        assert "input-spectrum" in result.output, "Should have input-spectrum option"
+        assert "input-id" in result.output, "Should have input-id option"
+        assert "output" in result.output, "Should have output option"
 
 
 class TestDataFileValidation:
