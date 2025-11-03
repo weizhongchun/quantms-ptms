@@ -57,8 +57,8 @@ from .ascore import AScore
     "--threads",
     "threads",
     type=int,
-    default=4,
-    help="Number of parallel threads (default: 4)",
+    default=1,
+    help="Number of parallel threads (default: 1)",
 )
 @click.option(
     "--debug", "debug", is_flag=True, help="Enable debug output and write debug log"

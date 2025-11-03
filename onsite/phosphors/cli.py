@@ -90,6 +90,11 @@ def phosphors(
         # Initialize processing pipeline
         exp = load_spectra(in_file)
         protein_ids, peptide_ids = load_identifications(id_file)
+        
+        # Build scan number to spectrum mapping for efficient lookup
+        scan_map = build_scan_to_spectrum_map(exp)
+        click.echo(f"Built scan number mapping: {len(scan_map)} MS2 spectra with scan numbers")
+        
         # Prime spectrum cache
         if peptide_ids:
             _ = find_spectrum_by_mz(exp, peptide_ids[0].getMZ(), peptide_ids[0].getRT())
@@ -131,7 +136,7 @@ def phosphors(
             for i, pid in enumerate(peptide_ids):
                 try:
                     result = process_peptide_identification(
-                        pid, exp, fragment_mass_tolerance, fragment_mass_unit, add_decoys, logger
+                        pid, exp, fragment_mass_tolerance, fragment_mass_unit, add_decoys, logger, scan_map
                     )
                     if result["status"] == "success":
                         processed_peptide_ids.append(result["new_pid"])
@@ -167,6 +172,12 @@ def phosphors(
                     seq_str = hit.getSequence().toString()
                     proforma = hit.getMetaValue("ProForma") if hit.metaValueExists("ProForma") else None
                     hit_payloads.append({"sequence": seq_str, "proforma": proforma})
+                
+                # Extract spectrum_reference for scan number lookup
+                spectrum_reference = None
+                if pid.metaValueExists("spectrum_reference"):
+                    spectrum_reference = pid.getMetaValue("spectrum_reference")
+                
                 tasks.append({
                     "idx": idx,
                     "mzml_path": in_file,
@@ -174,6 +185,7 @@ def phosphors(
                     "pid": {
                         "mz": pid.getMZ(),
                         "rt": pid.getRT(),
+                        "spectrum_reference": spectrum_reference,
                         "hits": hit_payloads,
                     }
                 })
@@ -268,7 +280,7 @@ def phosphors(
             logger.info(f"Total time: {elapsed:.2f} seconds")
 
         # Save results
-        click.echo(f"[{time.strftime("%H:%M:%S")}] Saving results to {out_file}")
+        click.echo(f"[{time.strftime('%H:%M:%S')}] Saving results to {out_file}")
         save_identifications(out_file, protein_ids, processed_peptide_ids)
 
     except KeyboardInterrupt:
@@ -338,6 +350,46 @@ def save_identifications(out_file, protein_ids, peptide_ids):
         print(f"Error saving results: {str(e)}")
         traceback.print_exc()
         sys.exit(1)
+
+
+def extract_scan_number_from_reference(spectrum_reference):
+    """Extract scan number from spectrum_reference string.
+    
+    Examples:
+        "controllerType=0 controllerNumber=1 scan=4886" -> 4886
+        "scan=5093" -> 5093
+    """
+    if not spectrum_reference:
+        return None
+    try:
+        if "scan=" in spectrum_reference:
+            # Extract number after "scan="
+            parts = spectrum_reference.split("scan=")
+            if len(parts) > 1:
+                scan_str = parts[-1].split()[0] if " " in parts[-1] else parts[-1]
+                return int(scan_str)
+    except (ValueError, IndexError):
+        pass
+    return None
+
+
+def build_scan_to_spectrum_map(exp):
+    """Build a mapping from scan number to spectrum for efficient lookup."""
+    scan_map = {}
+    for spec in exp:
+        if spec.getMSLevel() == 2 and spec.getPrecursors():
+            native_id = spec.getNativeID()
+            scan_num = extract_scan_number_from_reference(native_id)
+            if scan_num is not None:
+                scan_map[scan_num] = spec
+    return scan_map
+
+
+def find_spectrum_by_scan(exp, scan_number, scan_map=None):
+    """Find spectrum by scan number."""
+    if scan_map is None:
+        scan_map = build_scan_to_spectrum_map(exp)
+    return scan_map.get(scan_number)
 
 
 def find_spectrum_by_mz(exp, target_mz, rt=None, ppm_tolerance=10):
@@ -415,7 +467,21 @@ def _worker_process_pid(task):
         params = task["params"]
 
         exp = _worker_get_exp(mzml_path)
-        spectrum = find_spectrum_by_mz(exp, pid_info["mz"], pid_info.get("rt"))
+        
+        # First, try to find by scan number from spectrum_reference
+        spectrum = None
+        scan_number = None
+        
+        if pid_info.get("spectrum_reference"):
+            scan_number = extract_scan_number_from_reference(pid_info["spectrum_reference"])
+            if scan_number is not None:
+                scan_map = build_scan_to_spectrum_map(exp)
+                spectrum = find_spectrum_by_scan(exp, scan_number, scan_map)
+        
+        # Fallback to m/z and RT matching if scan number lookup failed
+        if spectrum is None:
+            spectrum = find_spectrum_by_mz(exp, pid_info["mz"], pid_info.get("rt"))
+        
         if spectrum is None:
             return {"status": "error", "reason": "spectrum_not_found"}
 
@@ -479,7 +545,7 @@ def _worker_process_pid(task):
         return {"status": "error", "reason": str(e)}
 
 
-def process_peptide_identification(pid, exp, fragment_mass_tolerance, fragment_mass_unit, add_decoys, logger):
+def process_peptide_identification(pid, exp, fragment_mass_tolerance, fragment_mass_unit, add_decoys, logger, scan_map=None):
     """Process a single peptide identification with error handling"""
     try:
         # Create new PeptideIdentification object
@@ -489,11 +555,33 @@ def process_peptide_identification(pid, exp, fragment_mass_tolerance, fragment_m
         new_pid.setSignificanceThreshold(0.0)
 
         # Find corresponding spectrum
-        spectrum = find_spectrum_by_mz(exp, pid.getMZ(), pid.getRT())
+        # First, try to find by scan number from spectrum_reference
+        spectrum = None
+        scan_number = None
+        
+        # Get spectrum_reference from peptide identification
+        if pid.metaValueExists("spectrum_reference"):
+            spec_ref = pid.getMetaValue("spectrum_reference")
+            scan_number = extract_scan_number_from_reference(spec_ref)
+            if scan_number is not None:
+                if scan_map is None:
+                    scan_map = build_scan_to_spectrum_map(exp)
+                spectrum = find_spectrum_by_scan(exp, scan_number, scan_map)
+                if spectrum and logger:
+                    logger.debug(f"Found spectrum by scan number {scan_number} for MZ {pid.getMZ()}")
+        
+        # Fallback to m/z and RT matching if scan number lookup failed
+        if spectrum is None:
+            spectrum = find_spectrum_by_mz(exp, pid.getMZ(), pid.getRT())
+            if spectrum and logger:
+                logger.debug(f"Found spectrum by MZ/RT matching for MZ {pid.getMZ()}")
+        
         if not spectrum:
-            logger.error(
-                f"Error processing identification: spectrum_not_found for MZ {pid.getMZ()}"
-            )
+            error_msg = f"spectrum_not_found for MZ {pid.getMZ()}"
+            if scan_number is not None:
+                error_msg += f" (scan={scan_number})"
+            if logger:
+                logger.error(f"Error processing identification: {error_msg}")
             return {"status": "error", "reason": "spectrum_not_found"}
 
         # Process each peptide hit

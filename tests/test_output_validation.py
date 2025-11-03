@@ -16,7 +16,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from onsite.onsitec import cli
 
-
 class TestOutputValidation:
     """Test output file validation and format checking."""
     

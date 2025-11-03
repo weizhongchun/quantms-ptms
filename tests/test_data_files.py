@@ -223,7 +223,6 @@ class TestAlgorithmExecution:
         except Exception as e:
             pytest.fail(f"PhosphoRS test failed: {e}")
 
-
 class TestCLIWithRealData:
     """Test CLI execution with real data files."""
     

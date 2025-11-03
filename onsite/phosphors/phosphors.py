@@ -99,7 +99,6 @@ def getp_style(n_peaks: int, w_mz: float, tol_da: float) -> float:
 
 def _add_distribution_to_cache(p: float, n: int, prob: float):
     """Add a distribution result to cache and manage cache size."""
-    global _distribution_cache
 
     if len(_distribution_cache) >= DISTRIBUTION_CACHE_SIZE:
         # Remove oldest entries (simple FIFO)
@@ -131,7 +130,6 @@ def binomial_tail_probability(k: int, n: int, p: float) -> float:
         return 0.0
 
     # Check cache first
-    global _distribution_cache
     if p in _distribution_cache and n in _distribution_cache[p]:
         cached_prob = _distribution_cache[p][n]
         # For cached results, we need to recalculate based on k
