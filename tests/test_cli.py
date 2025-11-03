@@ -202,7 +202,3 @@ def test_cli_unknown_command():
     assert result.exit_code != 0
     assert "No such command" in result.output
 
-
-
-
-
