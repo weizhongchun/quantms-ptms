@@ -145,8 +145,8 @@ logger = logging.getLogger(__name__)
 @click.option(
     "--threads",
     type=int,
-    default=4,
-    help="Number of threads to use (default: 4)"
+    default=1,
+    help="Number of threads to use (default: 1)"
 )
 @click.option(
     "--rt-tolerance",
@@ -673,5 +673,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
