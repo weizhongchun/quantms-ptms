@@ -1188,10 +1188,8 @@ def calculate_phospho_localization_compomics_style(
             print("Warning: No isomer profiles generated.")
             return None, None
 
-        # 3) Reduce spectrum by SDI delta-selection to obtain phosphoRsSpectrum
-        phospho_rs_spec = _reduce_by_delta_selection(
-            filtered_spec, profiles, fragment_tolerance, fragment_method_ppm
-        )
+        # 3) Use filtered spectrum directly (delta-based reduction disabled)
+        phospho_rs_spec = filtered_spec
 
         # --- Generate Theoretical Spectra and Score Against Reduced Spectrum ---
         spec_gen = TheoreticalSpectrumGenerator()
