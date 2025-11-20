@@ -99,7 +99,7 @@ The choice of tool should be guided by the specific requirements of the analysis
 
 - **Dataset**: PXD000138
 - **Input Files**: mzML and idXML files
-- **Validation**: Answer results
+- **Validation**: Ground truth results
 
 ## References
 
