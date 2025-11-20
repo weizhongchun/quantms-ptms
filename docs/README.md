@@ -214,12 +214,6 @@ python -m onsite.lucxor.cli -in spectra.mzML -id identifications.idXML -out resu
 
 The AScore algorithm provides phosphorylation site localization by analyzing MS/MS fragment ions to identify site-determining ions and computing localization probabilities based on fragment evidence.
 
-**Key Parameters:**
-
-- Fragment mass tolerance: 0.05 Da (default)
-- Multi-threading support: 1 threads (default)
-- Decoy site analysis: Optional
-
 **Output Metrics:**
 
 - `AScore_pep_score`: Overall peptide score
@@ -230,12 +224,6 @@ The AScore algorithm provides phosphorylation site localization by analyzing MS/
 
 The PhosphoRS algorithm implements a comprehensive approach using isomer generation, theoretical spectrum matching, and probability scoring for confident phosphorylation site assignment.
 
-**Key Parameters:**
-
-- Fragment tolerance: 0.05 Da (default)
-- Window size: 100.0 (for spectrum reduction)
-- Max depth: 8 (for intensity thresholds)
-
 **Output Metrics:**
 - Site-specific probability scores (0-100%)
 - Isomer details with sequence and score
@@ -244,24 +232,6 @@ The PhosphoRS algorithm implements a comprehensive approach using isomer generat
 ### LucXor (LuciPHOr2) Algorithm
 
 LucXor implements the complete LuciPHOr2 algorithm with two-stage processing for accurate PTM localization with false localization rate (FLR) estimation.
-
-**Two-Stage Workflow:**
-
-1. **Stage 1 (RN=0)**: FLR Estimation
-   - Process all PSMs with real and decoy permutations
-   - Calculate delta scores for all permutations
-   - Estimate false localization rates from decoy distributions
-
-2. **Stage 2 (RN=1)**: FLR Assignment
-   - Re-process PSMs using only real permutations
-   - Assign FLR values based on estimated distributions
-   - Generate final localization confidence scores
-
-**Key Parameters:**
-- Fragment method: CID or HCD
-- Fragment mass tolerance: 0.5 Da (default)
-- Modeling score threshold: 0.95
-- Minimum PSMs for modeling: 50
 
 **Output Metrics:**
 - `Luciphor_delta_score`: Main localization score
