@@ -40,7 +40,7 @@ onsite provides three complementary algorithms for PTM localization:
 - **Method**: Two-stage processing with FLR estimation
 - **Features**: False localization rate calculation, decoy-based validation
 - **Output**: Delta scores, peptide scores, global and local FLR
-- **Citation**: Fermin et al. (2011, 2013) *MCP* and *Bioinformatics*
+- **Citation**: Fermin et al. (2013, 2015) *MCP* and *Bioinformatics*
 
 ## Installation
 
@@ -302,4 +302,5 @@ If you have questions or need assistance:
 onsite builds upon the excellent work of the original algorithm developers and the OpenMS community. We thank all contributors and users for their feedback and support.
 
 ---
+
 
