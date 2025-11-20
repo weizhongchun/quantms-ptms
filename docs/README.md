@@ -20,7 +20,7 @@
 - 📈 **High Accuracy**: Confident site localization with statistical validation
 - 🧩 **Flexible API**: Both command-line and Python API support
 
-## 📊 Benchmark Highlights
+## 📊 Benchmark
 
 We benchmarked onsite algorithms on the PXD000138 dataset using unified mzML/idXML inputs and consistent filtering (FDR < 0.01, tool-specific localization thresholds). Key takeaways:
 
