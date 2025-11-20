@@ -1,0 +1,108 @@
+# Benchmark Results: PXD000138 Dataset
+
+## Overview
+
+This document presents the benchmark results of four phosphorylation site localization tools (LuciPHOr, Ascore, pyLucXor, and PhosphoRS) on the PXD000138 dataset. All tools were tested using identical input files (mzML and idXML) to ensure fair comparison.
+
+## Methodology
+
+### Data Processing Pipeline
+
+1. **Initial Processing**: LuciPHOr results were obtained using quantms workflow on PXD000138 dataset
+2. **Comparative Testing**: Ascore, pyLucXor, and PhosphoRS were tested using the same mzML and idXML files as LuciPHOr
+3. **Filtering Criteria**: 
+   - **LuciPHOr & pyLucXor**: local_flr < 0.01
+   - **Ascore**: Ascore_site > 20
+   - **PhosphoRS**: site_probs > 99%
+   - **All tools**: FDR < 0.01
+4. **Post-filtering**: Removed peptides with unambiguous sites and decoy peptides
+5. **Validation**: Matched against results to calculate True Positives (TP) and False Positives (FP)
+
+### Uncertainty Classification
+
+Uncertain phosphorylation sites were identified using criteria from the respective original papers:
+
+- **Ascore**: Ascore_site < 3
+- **LuciPHOr & pyLucXor**: Luciphor_delta_score < 3
+- **PhosphoRS**: site_prob < 75%
+
+## Results
+
+### Table 1: Well-Resolved Phosphorylation Sites
+
+| Tool | Phospho_Count | PhosphoDecoy_Count | Total_Sites | Global_FLR |
+|------|---------------|-------------------|-------------|------------|
+| **LuciPHOr** | 48186 | 1168 | 49354 | 0.0237 |
+| **Ascore** | 52906 | 1541 | 54447 | 0.0283 |
+| **pyLucXor** | 51468 | 1616 | 53084 | 0.0304 |
+| **PhosphoRS** | 50000 | 722 | 50722 | 0.0142 |
+
+### Table 2: Uncertain Phosphorylation Sites
+
+| Tool | Phospho_Count | PhosphoDecoy_Count | Total_Sites | Percentage_of_Total_PSMs | Global_FLR |
+|------|---------------|--------------------|-------------|--------------------------|------------|
+| **LuciPHOr** | 37337 | 5670 | 43007 | 9.977655 | 0.131839 |
+| **Ascore** | 23628 | 16921 | 40549 | 10.52425 | 0.417298 |
+| **pyLucXor** | 38970 | 6511 | 45481 | 10.74325 | 0.143159 |
+| **PhosphoRS** | 26354 | 4168 | 30522 | 6.614142 | 0.136557 |
+
+### Table 3: Site Localization Quality
+
+| Tool | Total_PSMs | Total_Phospho_Sites | Well_Resolved_Phospho_Sites | Uncertain_Phospho_Sites |
+|------|------------|---------------------|----------------------------|------------------------|
+| **LuciPHOr** | 111588 | 118625 | 48186 | 37337 |
+| **Ascore** | 111747 | 101382 | 52906 | 23628 |
+| **pyLucXor** | 111588 | 117341 | 51468 | 38970 |
+| **PhosphoRS** | 111747 | 107552 | 50000 | 26354 |
+
+## Analysis
+
+### Global False Localization Rate (FLR)
+
+PhosphoRS achieved the lowest Global FLR (0.0142), followed by LuciPHOr (0.0237), Ascore (0.0283), and pyLucXor (0.0304). This indicates PhosphoRS has the highest precision in phosphorylation site localization under the applied filtering criteria.
+
+### Well-Resolved Sites
+
+- **Ascore** identified the highest number of well-resolved phosphorylation sites (52,906)
+- **pyLucXor** identified 51,468 well-resolved sites
+- **PhosphoRS** identified 50,000 well-resolved sites
+- **LuciPHOr** identified 48,186 well-resolved sites
+
+### Uncertain Sites
+
+- **pyLucXor** had the highest number of uncertain sites (38,970)
+- **LuciPHOr** had 37,337 uncertain sites
+- **PhosphoRS** had 26,354 uncertain sites
+- **Ascore** had the lowest number of uncertain sites (23,628)
+
+### Trade-offs
+
+The results demonstrate a trade-off between sensitivity and specificity:
+
+- **PhosphoRS**: Best precision (lowest FLR) but moderate sensitivity
+- **Ascore**: Highest number of well-resolved sites with moderate FLR and lowest uncertainty
+- **pyLucXor**: High sensitivity but highest FLR and uncertainty
+- **LuciPHOr**: Balanced performance with good precision and moderate sensitivity
+
+## Conclusions
+
+Each tool demonstrates distinct strengths:
+
+1. **PhosphoRS** is recommended when precision is critical (lowest FLR: 1.42%)
+2. **Ascore** provides the best balance with highest well-resolved sites and lowest uncertainty
+3. **pyLucXor** offers high sensitivity but requires careful FLR consideration
+4. **LuciPHOr** provides reliable balanced performance suitable for general applications
+
+The choice of tool should be guided by the specific requirements of the analysis, weighing the importance of precision versus sensitivity in phosphorylation site localization.
+
+## Dataset Information
+
+- **Dataset**: PXD000138
+- **Input Files**: mzML and idXML files
+- **Validation**: Answer results
+
+## References
+
+- Filtering criteria and uncertainty thresholds are based on the original publications of each respective tool
+- All tools were evaluated under identical conditions to ensure fair comparison
+
