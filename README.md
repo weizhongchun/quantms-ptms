@@ -253,10 +253,10 @@ You can find example result files in the `data` directory. Here are the direct l
 
 For more detailed information:
 
-- [AScore Algorithm Documentation](algorithms/ascore.md)
-- [PhosphoRS Algorithm Documentation](algorithms/phosphors.md)
-- [LucXor Algorithm Documentation](algorithms/lucxor.md)
-- [Citations and References](citations.md)
+- [AScore Algorithm Documentation](docs/algorithms/ascore.md)
+- [PhosphoRS Algorithm Documentation](docs/algorithms/phosphors.md)
+- [LucXor Algorithm Documentation](docs/algorithms/lucxor.md)
+- [Citations and References](docs/citations.md)
 
 ## Contributing
 
@@ -302,5 +302,6 @@ If you have questions or need assistance:
 onsite builds upon the excellent work of the original algorithm developers and the OpenMS community. We thank all contributors and users for their feedback and support.
 
 ---
+
 
 
