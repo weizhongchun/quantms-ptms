@@ -245,9 +245,9 @@ You can find example result files in the `data` directory. Here are the direct l
 
 | Algorithm | Description | Result File |
 |---|---|---|
-| AScore | AScore phosphorylation site localization results | [AScore Example](../data/1_ascore_result.idXML) |
-| PhosphoRS | PhosphoRS phosphorylation site localization results | [PhosphoRS Example](../data/1_phosphors_result.idXML) |
-| LucXor | LucXor (LuciPHOr2) PTM localization results with FLR | [LucXor Example](../data/1_lucxor_result.idXML) |
+| AScore | AScore phosphorylation site localization results | [AScore Example](data/1_ascore_result.idXML) |
+| PhosphoRS | PhosphoRS phosphorylation site localization results | [PhosphoRS Example](data/1_phosphors_result.idXML) |
+| LucXor | LucXor (LuciPHOr2) PTM localization results with FLR | [LucXor Example](data/1_lucxor_result.idXML) |
 
 ## Documentation
 
