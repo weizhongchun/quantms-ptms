@@ -25,16 +25,16 @@
 onsite provides three complementary algorithms for PTM localization:
 
 ### 1. **AScore Algorithm**
-   - **Method**: Probability-based approach using binomial statistics
-   - **Features**: Site-determining ion analysis, fast processing
-   - **Output**: AScore values indicating localization confidence
-   - **Citation**: Beausoleil et al. (2006) *Nature Biotechnology*
+- **Method**: Probability-based approach using binomial statistics
+- **Features**: Site-determining ion analysis, fast processing
+- **Output**: AScore values indicating localization confidence
+- **Citation**: Beausoleil et al. (2006) *Nature Biotechnology*
 
 ### 2. **PhosphoRS Algorithm**
-   - **Method**: Compomics-style scoring with isomer analysis
-   - **Features**: Site-specific probabilities, detailed isomer analysis
-   - **Output**: Site probability scores and isomer details
-   - **Citation**: Taus et al. (2011) *Journal of Proteome Research*
+- **Method**: Compomics-style scoring with isomer analysis
+- **Features**: Site-specific probabilities, detailed isomer analysis
+- **Output**: Site probability scores and isomer details
+- **Citation**: Taus et al. (2011) *Journal of Proteome Research*
 
 ### 3. **LucXor (LuciPHOr2) Algorithm**
    - **Method**: Two-stage processing with FLR estimation
@@ -310,7 +310,7 @@ This project is licensed under the MIT License - see the [LICENSE](../LICENSE) f
 
 If you use onsite in your research, please cite:
 
-```
+```text
 onsite: Mass spectrometry post-translational modification localization tool. 
 https://github.com/bigbio/onsite
 ```
@@ -319,7 +319,7 @@ https://github.com/bigbio/onsite
 
 - [PyOpenMS](https://pyopenms.readthedocs.io/) - Python bindings for OpenMS
 - [OpenMS](https://www.openms.de/) - Open-source tools for mass spectrometry
-- [nf-core/quantms](https://nf-co.re/quantms) -Quantitative mass spectrometry workflow
+- [nf-core/quantms](https://nf-co.re/quantms) - Quantitative mass spectrometry workflow
 
 ## ❓ Need Help?
 
