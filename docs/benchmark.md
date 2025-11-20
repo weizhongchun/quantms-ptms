@@ -16,7 +16,7 @@ This document presents the benchmark results of four phosphorylation site locali
    - **PhosphoRS**: site_prob > 99%
    - **All tools**: FDR < 0.01
 4. **Post-filtering**: Removed peptides with unambiguous sites and decoy peptides
-5. **Validation**: Matched against results to calculate True Positives (TP) and False Positives (FP)
+5. **Validation**: Matched filtered results from each tool against the ground truth/reference dataset (see line 102) to calculate True Positives (TP) and False Positives (FP)
 
 ### Uncertainty Classification
 
